@@ -81,6 +81,7 @@ nonisolated public enum UserDef: String, CaseIterable, Identifiable, Sendable {
   case kFetchSuggestionsFromPerceptionOverrideModel = "FetchSuggestionsFromPerceptionOverrideModel"
   case kUseFixedCandidateOrderOnSelection = "UseFixedCandidateOrderOnSelection"
   case kAutoCorrectReadingCombination = "AutoCorrectReadingCombination"
+  case kAutoSwitchToAlphanumericalOnConsecutiveErrors = "AutoSwitchToAlphanumericalOnConsecutiveErrors"
   case kReadingNarrationCoverage = "ReadingNarrationCoverage"
   case kAlsoConfirmAssociatedCandidatesByEnter = "AlsoConfirmAssociatedCandidatesByEnter"
   case kKeepReadingUponCompositionError = "KeepReadingUponCompositionError"
@@ -499,6 +500,7 @@ nonisolated extension UserDef {
     case .kFetchSuggestionsFromPerceptionOverrideModel: return .bool(true)
     case .kUseFixedCandidateOrderOnSelection: return .bool(false)
     case .kAutoCorrectReadingCombination: return .bool(true)
+    case .kAutoSwitchToAlphanumericalOnConsecutiveErrors: return .bool(true)
     case .kReadingNarrationCoverage: return .integer(0)
     case .kAlsoConfirmAssociatedCandidatesByEnter: return .bool(false)
     case .kKeepReadingUponCompositionError: return .bool(false)
@@ -906,6 +908,11 @@ nonisolated extension UserDef {
         userDef: self,
         shortTitle: "i18n:UserDef.kAutoCorrectReadingCombination.shortTitle",
         description: "i18n:UserDef.kAutoCorrectReadingCombination.description"
+      )
+    case .kAutoSwitchToAlphanumericalOnConsecutiveErrors: return .init(
+        userDef: self,
+        shortTitle: "i18n:UserDef.kAutoSwitchToAlphanumericalOnConsecutiveErrors.shortTitle",
+        description: "i18n:UserDef.kAutoSwitchToAlphanumericalOnConsecutiveErrors.description"
       )
     case .kReadingNarrationCoverage: return .init(
         userDef: self, shortTitle: "i18n:UserDef.kReadingNarrationCoverage.shortTitle",
