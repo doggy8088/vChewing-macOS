@@ -7,7 +7,7 @@ This handbook briefs AI coding assistants on the vChewing (唯音) macOS reposit
 - **Purpose**: Native Zhuyin / Bopomofo input method for macOS with optional phonetic and stroke keyboards, simplified ↔ traditional isolation, and sandboxed distribution installers.
 - **Implementation**: Pure Swift modules layered on AppKit/IMK. C(++)/ObjC(++) bridges exist only where Swift cannot interface directly with legacy assets.
 - **Primary packages**:
-  - `vChewing_MainAssembly4Darwin`: IMK front-end (InputSession, UI bridges, sandbox glue).
+  - `vChewing_MainAssembly4Darwin`: IMK front-end (Darwin surface `InputSession_DarwinSurface`, session-controller bindings, `SessionHost` wiring, UI bridges, sandbox glue).
   - `vChewing_Typewriter`: Typing FSM, session core protocol (`SessionCoreProtocol`), Tekkon integration, user preference wiring, cassette/stroke handling.
   - `vChewing_Homa`: DAG-DP assembler (sentence assembler) with candidate override, consolidation, revolver, and perception hooks.
   - `vChewing_Tekkon`: Keyboard parsers, Zhuyin/Bopomofo composer, stroke cassette parser, phonabet utilities.
@@ -23,9 +23,9 @@ This handbook briefs AI coding assistants on the vChewing (唯音) macOS reposit
 - **CLI builds**:
   - Universal binary release: `make release` (builds arm64 + x86_64, creates signed .app bundles in `Build/Products/Release/`).
   - Archive with dSYMs: `make archive` (creates `.xcarchive` in Xcode Archives folder).
-  - Debug native build: `make debug` (single-arch, target output in `.build/debug/`).
+  - Debug native build: `make debug` (single-arch; `.app` bundles output under `Build/Products/Debug/`).
   - Package-only tests: `cd Packages/vChewing_Typewriter && swift build && swift test`.
-- **First-time setup**: `make update` (fetches/generates lexicons) then `make release`. Ensure Xcode DerivedData location is set to "Relative to Workspace" to satisfy make recipes.
+- **First-time setup**: `make update` (fetches/generates lexicons) then `make release`.
 
 ## 3. Repository Layout (quick map)
 
@@ -36,6 +36,7 @@ This handbook briefs AI coding assistants on the vChewing (唯音) macOS reposit
 - `Packages/vChewing_Tekkon/Sources/Tekkon/`: Keyboard parsers, composer, Zhuyin constants.
 - `Packages/vChewing_LangModelAssembly/Sources/LangModelAssembly/`: LM instantiators, perception override, associated phrase derivation.
 - `Packages/vChewing_OSFrameworkImpl/`: AppKit result-builder DSL for SettingsCocoa window, etc.
+- `Packages/vChewing_SettingsUI/`: Preferences UI as a standalone package — SwiftUI `SettingsUI` for macOS 14+ (incl. the phrase editor and the About pane) plus the AppKit `SettingsCocoa` alternate; host actions are injected via `SettingsUIHost` closures (`SettingsUIHostWiring.swift` in MainAssembly).
 - `Packages/vChewing_CandidateWindow/`: The Candidate window.
 - `Plugins/BundleApps/`: CommandPlugin that assembles `.app` bundles and optional `.xcarchive` archives (codesigning, entitlements, SPM bundle filtering).
 - `Makefile`: Root-level automation for universal binary builds (`swift build --arch arm64/x86_64`, `lipo` merge), lexicon toolchain integration, and CommandPlugin invocation.
@@ -47,7 +48,7 @@ This handbook briefs AI coding assistants on the vChewing (唯音) macOS reposit
 2. **FSM triage**: `InputHandler` in Typewriter interprets events, orchestrates Tekkon composer, updates the Homa assembler, and switches `IMEState` instances.
 3. **Composer**: Tekkon manages Zhuyin/phonetic/stroke buffers, auto-correction, cassette mode, and exposes inline display strings.
 4. **Assembler**: Homa Assembler builds DAG segments, snapshots perception intelligences, exposes candidate / consolidation / revolver APIs, and emits `assembledSentence` for UI rendering.
-5. **Language Models**: `LMAssembly` merges factory lexicons (via `FactoryTextMapLexicon` backed by Vanguard TextMap format), user phrases, exclusion lists, associated phrase suggestions, and perception override data, etc.
+5. **Language Models**: `LMAssembly` merges factory lexicons (Vanguard TextMap format, served by `VanguardTrie.TextMapTrie` in the package-local `TrieKit` target), user phrases, exclusion lists, associated phrase suggestions, POM (perception / fading-memory) n-gram statistics, and perception override suggestions.
 6. **UI update**: `InputSession` refreshes candidate window, composition buffer, tooltips, notifications, symbol menu.
 
 Reference `algorithm.md` for the deep algorithm write-up (zh-Hant).
@@ -55,7 +56,7 @@ Reference `algorithm.md` for the deep algorithm write-up (zh-Hant).
 ## 5. Development Guardrails
 
 - **Language**: Code comments, docs, and commit messages in English or zh-Hant. (zh-Hans only in files if filenamestem ends with `-CHS`.)
-- **UI**: AppKit only. No Interface Builder nibs/storyboards. Keep UI work on the main actor. Most AppKit Window views are implemented using AppKit Result Builder DSL.
+- **UI**: AppKit by default — no Interface Builder nibs/storyboards, and AppKit windows are implemented with the AppKit Result Builder DSL (`vChewing_OSFrameworkImpl`). Exceptions: the SwiftUI settings surface (`vChewing_SettingsUI`, macOS 14+) and the SwiftUI installer app (`vChewing_InstallerAssembly4Darwin`). Keep UI work on the main actor.
 - **Preferences**: Extend `UserDef`, `PrefMgrProtocol`, and `PrefMgr` together. Avoid naked `UserDefaults.standard` access except in constrained scenarios.
 - **User data paths**: Avoid hard-coded user data paths except where necessary in package test targets.
 - **State machine**: Prefer new `IMEState` enum cases and explicit transition APIs over boolean shortcuts. `SessionCoreProtocol` (Typewriter) provides `switchState()`/`resetInputHandler()` default implementations shared by mock tests and production; extend `InputHandlerProtocol` for per-event triage logic.

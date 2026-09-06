@@ -54,7 +54,7 @@
 1. NSEvent 抵達 → IMK 實例化的 `IMKInputSessionController`（vChewing_IMKUtils）經 `SessionControllerSputnik` 轉發至對應的 `InputSession`；Darwin 表面 `InputSession_DarwinSurface.handleNSEvent` 將 NSEvent 轉為 KBEvent 後交給 portable 會話核心。
 2. InputSession 根據 KeyUp 與 KeyDown 的文脈關係事先決定某些行為（比如對 Shift 鍵的單擊行為的感知），然後將 KeyDown（KBEvent）交給 Typewriter.InputHandler 分診。
 3. Tekkon 組音（依使用者配置的鍵盤與容錯規則）得出合法注音鍵序列，由 InputHandler 將合法注音鍵序列塞入 Homa 引擎。
-4. LangModelAssembly 依鍵序列回傳候選語元（unigram，含分數）。
+4. LangModelAssembly 依鍵序列回傳候選語元（unigram 為主，另附加帶前後文語境的 bigram／trigram 語元——POM n-gram 注入詳見後文），皆含分數。
 5. Homa 以候選節點建立 DAG，用動態規劃求最大總分路徑，產出組句。此過程不依賴「Vertex Topological-Sort Relax」方法。
 6. MainAssembly 依 IMEState 與結果更新 UI、提交輸出至目標應用。
 
@@ -107,12 +107,13 @@ Typewriter 是可以在 Linux 系統下建置的 Swift Package，以一個比較
 ### 資料模型
 
 檔案位置：Packages/vChewing_Homa/Sources/Homa/
-- Gram：單一候選（值＋分數，必要時可帶 previous 字段）。
+- Gram：單一候選（值＋機率分數；可選 previous／anterior 字段承載雙元／三元語法的前驅字詞值、不含讀音）。
 - Node：某一段鍵序列對應的一組 Gram，含：
   - keyArray：覆蓋的鍵數。
   - grams：候選清單。
   - currentOverrideType / overridingScore：當前覆寫狀態與強制權重。
   - isExplicitlyOverridden：是否因使用者選字而覆寫。
+  - getScore(previous:anterior:)：語境計分（見 PathFinder）——帶前驅字詞值時於 grams 中找相符的雙元／三元圖，僅當權重高於 unigram 基線時取代之；節點覆寫狀態優先於此計分。
 - Segment：從某起點可用的多種節幅（length → Node）。
 - GramInPath：回傳給外層的已選語元（值＋override 標記）。
 - CandidatePair / CandidatePairWeighted：候選視圖與權重封裝。
@@ -124,11 +125,13 @@ Typewriter 是可以在 Linux 系統下建置的 Swift Package，以一個比較
 
 - 令 keyCount 為鍵序列長度；建立陣列：
   - dp[i]：到達位置 i 的最佳分數（預設負無限，dp[0]=0）
-  - parent[i]：到達 i 的最佳前驅節點（Node）
+  - parent[i]：到達 i 的最佳前驅節點（Node）與其幅節長度
 - 對每個可達位置 i，枚舉該起點的所有節點（length, node）：
-  - next = i + length；newScore = dp[i] + node.score
+  - next = i + length；newScore = dp[i] + node.getScore(previous:anterior:)
+  - previous／anterior 取自「最佳路徑前驅」：previous 為 parent[i] 節點的字詞值；anterior 為沿最佳路徑自 i 再往前跳 parent[i] 幅長後（前驅節點起點之前）的字詞值——bigram「最佳路徑前驅」近似的三元擴展，1D DP 結構不變
+  - getScore 僅在 grams 中找到「previous（或連同 anterior）相符、且權重高於 unigram 基線」的雙元／三元圖時才取代 unigram 分數
   - 若 newScore > dp[next]，則更新 dp[next] 與 parent[next]
-- 由尾端回溯 parent，依 Node 的 keyArray.count 往回跳，建立最終路徑（GramInPath 陣列）
+- 由尾端回溯 parent，依各前驅節點的幅節長度往回跳（非 gram.keyArray 長度——前綴匹配可能回傳更長的 gram），建立最終路徑（GramInPath 陣列）
 
 此作法為典型 DAG 上的動態規劃，時間複雜度約為 O(N + E)（N 為節點位置，E 為可能邊數），記憶體使用量小且實作簡潔。
 
@@ -151,10 +154,10 @@ LangModelAssembly 對多個子語言模型進行匯整、去重、替換與增�
 常見子 LM（可視專案配置有所變動）：
 - lmPlainBopomofo：ㄅ半注音對應單字/詞，使用倚天中文 DOS 環境原版候選字陳列順序。
 - lmCassette：磁帶模組，可以讀入 CIN2 格式的輸入法表格，也與 CIN1 相容。
-- lmCoreEX / SQL 擴充：SQL/資料庫驅動的核心辭典。lmCoreEX 用於純文字格式的使用者片語辭典。
+- lmCoreEX：以「位元組範圍索引」承載純文字辭典資料的通用模組，用於使用者片語辭典等（本倉庫執行期字典載體為純文字／TextMap，已無 SQL 資料庫辭典）。
 - lmReplacements：詞彙替換表（正規化、傳統/簡體外掛轉換之前後）
 - lmAssociates：關聯詞語（含標點相依）
-- LXPerceptor：感知覆寫（根據使用者交互行為暫調排序、給出 ngram 建議結果。）
+- LXPerceptor：漸退記憶（POM）感知模組——觀察使用者選字／遞交行為，以三層 ngramKey（head 讀音＋前後文值）寫入 LRU 記憶並隨時間衰減；帶前後文的記憶可作為 Homa 的 bigram／trigram 統計來源（見「使用者選字與優先規則」），另有建議查詢通道供 Typewriter 自動套用。
 - 擴充：日期時間等服務模式巨集、數字小鍵盤模式、符號表等（LMInstantiator_*）
 
 各 gram 會帶有可加總的「分數」（通常是對數空間值或相容值），以利 Homa 做組句結果推算。
@@ -162,6 +165,7 @@ LangModelAssembly 對多個子語言模型進行匯整、去重、替換與增�
 ### 使用者選字與優先規則
 
 - 使用者對某鍵序列手動選擇某候選時，Typewriter 會要求 Homa 對該鍵序列上調該候選的優先級（或標記 explicit override），影響之後同鍵序列的排序。這期間可能會對任何影響該目的的 Node 使用指定的降權評分。
+- POM（漸退記憶）亦以「Homa n-gram 統計來源」直接參與組句：`unigramsFor` 的注入路徑於 `kFetchSuggestionsFromPerceptionOverrideModel`（預設啟用）開啟時以 `perceptionsFor(headReading:)` 撈取記憶，僅將帶上下文（previous／anterior）者附加為 bigram／trigram gram（bare unigram 記憶不進引擎、由 Typewriter 建議通道浮現）。讀音比對預設 `.exact`：查詢段帶聲調（具體讀音）時須與記憶逐字等值——避免「打『有』出『右』」類跨聲調錯位注入；查詢段不帶聲調（狂拼聲調桶代表鍵／前綴 partial）維持去聲調等值容錯。`.toneInsensitivePrefix` 則為全局去聲調等值、供狂拼建議查詢。另設注音錯位守衛：注音讀音記憶若「候選字數 ≠ head 讀音段數」（錯位髒資料，如「體式」誤記於單鍵 ㄕˊ 之下）一律不套用／不餵入。Typewriter 的建議套用入口同樣受 `kFetchSuggestionsFromPerceptionOverrideModel` 把守。
 - 單音節與多音節的相對優先可藉由分數基準或「POM 所帶來的微幅增益」維持體感合理性，又避免壓制更長詞彙的組句。
 
 ### 關聯詞語與符號輸出
@@ -216,6 +220,6 @@ LangModelAssembly 對多個子語言模型進行匯整、去重、替換與增�
 
 ## 文件版本與更新紀錄
 
-- 文件版本：1.5
-- 最後更新：2026-09-02
-- 適用版本：晚於 vChewing 4.4.7 的版本
+- 文件版本：1.6
+- 最後更新：2026-09-06
+- 適用版本：vChewing 4.7.3 SP1（Build 4731）及之後的版本
