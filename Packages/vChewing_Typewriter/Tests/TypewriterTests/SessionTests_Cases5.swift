@@ -408,4 +408,31 @@ extension InputHandlerTests.Session {
     #expect(pcbMock.showCount >= 1, "PCB 應於組字時顯示")
     #expect(hintUI.status.isShown == false, "PCB 顯示時模式提示應被收起")
   }
+
+  /// 測試連續錯誤自動切換至 ABC 後，重新切回唯音時自動恢復為中文模式。
+  @Test
+  func test515_ActivationAfterAutoSwitchToABC_ResetsASCIIModeToChinese() throws {
+    #expect(testSession.isActivated)
+    InputSession.current = testSession
+    defer {
+      InputSession.isAutoSwitchedToABC = false
+      testSession.isASCIIMode = false
+      InputSession.isASCIIModeForAllClients = false
+    }
+
+    // 模擬自動切換至 ABC 後的狀態：isASCIIMode == true, isAutoSwitchedToABC == true
+    testSession.isASCIIMode = true
+    InputSession.isAutoSwitchedToABC = true
+
+    #expect(testSession.isASCIIMode == true)
+    #expect(InputSession.isAutoSwitchedToABC == true)
+
+    // 模擬使用者切回唯音：呼叫 performServerActivation
+    testSession.performServerActivation()
+
+    // 驗證 isAutoSwitchedToABC 已被重置為 false，且 isASCIIMode 已自動恢復為 false（中文模式）
+    #expect(InputSession.isAutoSwitchedToABC == false)
+    #expect(testSession.isASCIIMode == false)
+    #expect(InputSession.isASCIIModeForAllClients == false)
+  }
 }
