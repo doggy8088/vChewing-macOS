@@ -174,6 +174,9 @@ public final class PrefMgr: PrefMgrProtocol, Sendable {
   @AppProperty(userDef: .kAutoSwitchToAlphanumericalOnConsecutiveErrors)
   public var autoSwitchToAlphanumericalOnConsecutiveErrors: Bool
 
+  @AppProperty(userDef: .kConsecutiveTypingErrorsThreshold)
+  public var consecutiveTypingErrorsThreshold: Int
+
   @AppProperty(userDef: .kAlsoConfirmAssociatedCandidatesByEnter)
   public var alsoConfirmAssociatedCandidatesByEnter: Bool
 
