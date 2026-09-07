@@ -23,6 +23,7 @@ public struct VwrSettingsPaneBehavior: View {
         UserDef.kShowNotificationsWhenTogglingShift.renderUI()
         UserDef.kAlwaysShowTooltipTextsHorizontally.renderUI()
           .disabled(Bundle.main.preferredLocalizations[0] == "en")
+        UserDef.kShowModeDescriptionOnActivatingServer.renderUI()
         UserDef.kBeepSoundPreference.renderUI()
       }
 

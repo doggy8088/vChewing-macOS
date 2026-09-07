@@ -34,6 +34,7 @@ nonisolated public enum UserDef: String, CaseIterable, Identifiable, Sendable {
   case kPinyinTypingEnabled = "PinyinTypingEnabled"
   case kBasicKeyboardLayout = "BasicKeyboardLayout"
   case kAlphanumericalKeyboardLayout = "AlphanumericalKeyboardLayout"
+  case kShowModeDescriptionOnActivatingServer = "ShowModeDescriptionOnActivatingServer"
   case kShowNotificationsWhenTogglingCapsLock = "ShowNotificationsWhenTogglingCapsLock"
   case kShowNotificationsWhenTogglingEisu = "ShowNotificationsWhenTogglingEisu"
   case kShowNotificationsWhenTogglingShift = "ShowNotificationsWhenTogglingShift"
@@ -451,6 +452,7 @@ nonisolated extension UserDef {
     case .kPinyinTypingEnabled: return .bool(false)
     case .kBasicKeyboardLayout: return .string(Self.kDefaultBasicKeyboardLayout)
     case .kAlphanumericalKeyboardLayout: return .string(Self.kDefaultAlphanumericalKeyboardLayout)
+    case .kShowModeDescriptionOnActivatingServer: return .bool(false)
     case .kShowNotificationsWhenTogglingCapsLock: return .bool(true)
     case .kShowNotificationsWhenTogglingEisu: return .bool(true)
     case .kShowNotificationsWhenTogglingShift: return .bool(true)
@@ -626,6 +628,11 @@ nonisolated extension UserDef {
     case .kAlphanumericalKeyboardLayout: return .init(
         userDef: self, shortTitle: "i18n:UserDef.kAlphanumericalKeyboardLayout.shortTitle",
         description: "i18n:UserDef.kAlphanumericalKeyboardLayout.description"
+      )
+    case .kShowModeDescriptionOnActivatingServer: return .init(
+        userDef: self,
+        shortTitle: "i18n:UserDef.kShowModeDescriptionOnActivatingServer.shortTitle",
+        description: "i18n:UserDef.kShowModeDescriptionOnActivatingServer.description"
       )
     case .kShowNotificationsWhenTogglingCapsLock: return .init(
         userDef: self,

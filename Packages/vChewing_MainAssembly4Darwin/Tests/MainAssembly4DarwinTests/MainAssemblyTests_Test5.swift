@@ -238,3 +238,177 @@ extension MainAssemblyTests {
     }
   }
 }
+
+extension MainAssemblyTests {
+  /// 啟用時 performServerActivation（快速路徑）應以 statusUI 顯示提示並記錄於 state（不經
+  /// switchState）。提示經 performServerActivation 的 defer 以 0.05s 延遲脫手顯示；單元
+  /// 測試環境 bypass 為同步，故可直接斷言。
+  @Test
+  func test508_ModeDescriptionHintShownUponActivationWhenEnabled() throws {
+    let originalPref = PrefMgr.shared.showModeDescriptionOnActivatingServer
+    let originalUI = testSession.ui
+    defer {
+      PrefMgr.shared.showModeDescriptionOnActivatingServer = originalPref
+      testSession.ui = originalUI
+    }
+    PrefMgr.shared.showModeDescriptionOnActivatingServer = true
+    let uiMock = MockSessionUI4ModeDescriptionHint(capsLockIsOn: false)
+    testSession.ui = uiMock
+    InputSession.current = testSession
+    testSession.performServerActivation()
+    #expect(testSession.state.type == .ofEmpty)
+    #expect(!testSession.state.tooltip.isEmpty)
+    #expect(uiMock.statusUIMock?.shownTooltip?.hasPrefix("► ") == true)
+    #expect(uiMock.statusUIMock?.shownTooltip?.contains("i18n:TypingMode.i18nKey4InlineModeHint.") == true)
+    #expect(uiMock.statusUIMock?.shownDuration == 0.7)
+    #expect(uiMock.statusUIMock?.showCount == 1)
+    #expect(uiMock.statusUIMock?.syncCount == 1)
+  }
+
+  /// 關閉（預設為啟用，此處顯式關閉）時 performServerActivation 不得產生打字模式提示。
+  @Test
+  func test509_ModeDescriptionHintSuppressedUponActivationWhenDisabled() throws {
+    let originalPref = PrefMgr.shared.showModeDescriptionOnActivatingServer
+    let originalUI = testSession.ui
+    defer {
+      PrefMgr.shared.showModeDescriptionOnActivatingServer = originalPref
+      testSession.ui = originalUI
+    }
+    PrefMgr.shared.showModeDescriptionOnActivatingServer = false
+    let uiMock = MockSessionUI4ModeDescriptionHint(capsLockIsOn: false)
+    testSession.ui = uiMock
+    InputSession.current = testSession
+    testSession.performServerActivation()
+    #expect(testSession.state.type == .ofEmpty)
+    #expect(uiMock.statusUIMock?.shownTooltip == nil)
+  }
+
+  /// 啟用且英數模式時提示須用 ASCII 專屬 key（測試環境無 l10n、`.i18n` 回退鍵名）。
+  @Test
+  func test510_ModeDescriptionHintShownUponActivationInASCIIMode() throws {
+    let originalPref = PrefMgr.shared.showModeDescriptionOnActivatingServer
+    let originalASCIIMode = testSession.isASCIIMode
+    let originalUI = testSession.ui
+    defer {
+      PrefMgr.shared.showModeDescriptionOnActivatingServer = originalPref
+      testSession.isASCIIMode = originalASCIIMode
+      testSession.ui = originalUI
+    }
+    PrefMgr.shared.showModeDescriptionOnActivatingServer = true
+    testSession.isASCIIMode = true
+    let uiMock = MockSessionUI4ModeDescriptionHint(capsLockIsOn: false)
+    testSession.ui = uiMock
+    InputSession.current = testSession
+    testSession.performServerActivation()
+    #expect(testSession.state.type == .ofEmpty)
+    #expect(uiMock.statusUIMock?.shownTooltip == "► i18n:TypingMode.i18nKey4InlineModeHint.ascii")
+    #expect(uiMock.statusUIMock?.shownDuration == 0.7)
+  }
+
+  /// 啟用、非英數、Caps Lock 亮燈時提示須用 asciiCpLk 專屬 key（此際字母鍵可直接敲小寫英數）。
+  @Test
+  func test511_ModeDescriptionHintShownUponActivationWithCapsLockLit() throws {
+    let originalPref = PrefMgr.shared.showModeDescriptionOnActivatingServer
+    let originalBypass = PrefMgr.shared.bypassNonAppleCapsLockHandling
+    let originalASCIIMode = testSession.isASCIIMode
+    let originalUI = testSession.ui
+    defer {
+      PrefMgr.shared.showModeDescriptionOnActivatingServer = originalPref
+      PrefMgr.shared.bypassNonAppleCapsLockHandling = originalBypass
+      testSession.isASCIIMode = originalASCIIMode
+      testSession.ui = originalUI
+    }
+    PrefMgr.shared.showModeDescriptionOnActivatingServer = true
+    PrefMgr.shared.bypassNonAppleCapsLockHandling = false
+    testSession.isASCIIMode = false
+    let uiMock = MockSessionUI4ModeDescriptionHint(capsLockIsOn: true)
+    testSession.ui = uiMock
+    InputSession.current = testSession
+    testSession.performServerActivation()
+    #expect(testSession.state.type == .ofEmpty)
+    #expect(uiMock.statusUIMock?.shownTooltip == "► i18n:TypingMode.i18nKey4InlineModeHint.asciiCpLk")
+    #expect(uiMock.statusUIMock?.shownDuration == 0.7)
+  }
+
+  /// 提示以 0.05s 延遲脫手顯示、排在 IMK 隨後的 setValue（內含 hidePalettes）之後——
+  /// 立即呼叫 setValue 模擬該連續技，提示仍應恰好顯示一次、不被蓋掉（flicker 回歸）。
+  @Test
+  func test512_ModeDescriptionHintShownOnceDespitePostActivationSetValue() throws {
+    let originalPref = PrefMgr.shared.showModeDescriptionOnActivatingServer
+    let originalUI = testSession.ui
+    defer {
+      PrefMgr.shared.showModeDescriptionOnActivatingServer = originalPref
+      testSession.ui = originalUI
+    }
+    PrefMgr.shared.showModeDescriptionOnActivatingServer = true
+    let uiMock = MockSessionUI4ModeDescriptionHint(capsLockIsOn: false)
+    testSession.ui = uiMock
+    InputSession.current = testSession
+    testSession.performServerActivation()
+    testSession.setValue(nil, forTag: 0)
+    #expect(testSession.state.type == .ofEmpty)
+    #expect(!testSession.state.tooltip.isEmpty)
+    #expect(uiMock.statusUIMock?.showCount == 1)
+    #expect(uiMock.statusUIMock?.shownTooltip?.hasPrefix("► ") == true)
+    #expect(uiMock.statusUIMock?.shownTooltip?.contains("i18n:TypingMode.i18nKey4InlineModeHint.") == true)
+  }
+
+  /// 浮動組字窗（PCB）顯示中且其頂端高於打字列頂端時，提示給定點應上抬至 PCB 頂端之上、
+  /// 避免與 PCB 重疊；PCB 頂端不高於打字列頂端時點位維持不變（max 比較自然不變）。
+  @Test
+  func test513_ModeDescriptionHintClearsPopupCompositionBuffer() throws {
+    let originalPref = PrefMgr.shared.showModeDescriptionOnActivatingServer
+    let originalUI = testSession.ui
+    defer {
+      PrefMgr.shared.showModeDescriptionOnActivatingServer = originalPref
+      testSession.ui = originalUI
+    }
+    PrefMgr.shared.showModeDescriptionOnActivatingServer = true
+    let pcbMock = MockPCB4ModeDescriptionHint()
+    pcbMock.isShown = true
+    pcbMock.frame = CGRect(x: 12, y: 100, width: 96, height: 24) // maxY = 124
+    let uiMock = MockSessionUI4ModeDescriptionHint(capsLockIsOn: false, pcb: pcbMock)
+    testSession.ui = uiMock
+    InputSession.current = testSession
+    testSession.performServerActivation()
+    #expect(uiMock.statusUIMock?.shownTooltip?.contains("i18n:TypingMode.i18nKey4InlineModeHint.") == true)
+    #expect(uiMock.statusUIMock?.shownPoint?.y == 124)
+    // PCB 頂端不高於打字列頂端 → 點位維持打字列頂端不變。
+    pcbMock.frame = CGRect(x: 12, y: 0, width: 96, height: 0.2) // maxY = 0.2
+    testSession.performServerActivation()
+    let topOfLineHeightRect = testSession.updateVerticalTypingStatus()
+    #expect(uiMock.statusUIMock?.shownPoint?.y == topOfLineHeightRect.origin.y + topOfLineHeightRect.size.height)
+  }
+
+  /// 組字開始（浮動組字窗 PCB 顯示）時，仍在顯示中的打字模式提示應被收起——PCB 於
+  /// activation 之後才出現、顯示當下的抬升避讓鞭長莫及，直接收起避免提示窗擋住 PCB。
+  @Test
+  func test514_ModeDescriptionHintDismissedWhenCompositionBufferAppears() throws {
+    let originalPref = PrefMgr.shared.showModeDescriptionOnActivatingServer
+    let originalHardened = PrefMgr.shared.securityHardenedCompositionBuffer
+    let originalMixedASCII = testHandler.prefs.mixedAlphanumericalEnabled
+    let originalUI = testSession.ui
+    defer {
+      PrefMgr.shared.showModeDescriptionOnActivatingServer = originalPref
+      PrefMgr.shared.securityHardenedCompositionBuffer = originalHardened
+      testHandler.prefs.mixedAlphanumericalEnabled = originalMixedASCII
+      testSession.ui = originalUI
+    }
+    PrefMgr.shared.showModeDescriptionOnActivatingServer = true
+    PrefMgr.shared.securityHardenedCompositionBuffer = true // clientMitigationLevel → 2（PCB 路徑）
+    let pcbMock = MockPCB4ModeDescriptionHint()
+    let uiMock = MockSessionUI4ModeDescriptionHint(capsLockIsOn: false, pcb: pcbMock)
+    testSession.ui = uiMock
+    InputSession.current = testSession
+    testSession.resetInputHandler(forceComposerCleanup: true)
+    testClient.clear()
+    testHandler.prefs.mixedAlphanumericalEnabled = true
+    testSession.performServerActivation()
+    #expect(uiMock.statusUIMock?.showCount == 1)
+    #expect(uiMock.statusUIMock?.isShown == true)
+    typeSentenceOrCandidates("abc")
+    #expect(testSession.state.type == .ofInputting)
+    #expect(pcbMock.showCount >= 1, "PCB 應於組字時顯示")
+    #expect(uiMock.statusUIMock?.isShown == false, "PCB 顯示時模式提示應被收起")
+  }
+}
