@@ -50,6 +50,9 @@ final class MainAssemblyTests {
     UserDef.resetAll()
     SettingsUIHost.wireUp()
     SessionHost.wireUp()
+    // 生產路徑的 LMMgr.shared 已改由 phraseEditorDelegateProvider 延遲實體化；
+    // 測試需要其 KVO 觀察器在場以錄製路徑失效警示，故在此顯式武裝。
+    _ = LMMgr.shared
     LMMgr.prepareForUnitTests()
     LMMgr.resetRecordedPathInvalidityAlerts()
     testLM = LMAssembly.LMInstantiator.construct { _ in
