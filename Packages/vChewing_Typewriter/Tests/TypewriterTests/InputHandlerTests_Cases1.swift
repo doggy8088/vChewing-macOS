@@ -4013,6 +4013,58 @@ extension InputHandlerTests {
     #expect(testHandler.assembler.assembledSentence.map(\.value) == ["時"])
   }
 
+  /// 第一聲（字串無聲調記號）具體讀音不得被跨聲調 contextual 記憶綁架（issue #610 形：
+  /// 打 ㄕㄥ 組字預設「聖(ㄕㄥˋ)」、候選窗第一「生(ㄕㄥ)」——引擎注入誤把 ㄕㄥˋ 記憶
+  /// 附到 ㄕㄥ 節點所致）。單鍵查詢走嚴格逐字等值後，組句應維持「生」。
+  @Test
+  func test_IH510_FirstToneQueryNotHijackedByCrossToneMemory() throws {
+    guard let testHandler, let testSession else {
+      Issue.record("testHandler and testSession at least one of them is nil.")
+      return
+    }
+    clearTestPOM()
+    defer {
+      testHandler.currentLM.clearTemporaryData(isFiltering: false)
+      testHandler.prefs.furiousTypingEnabled = false
+      testHandler.prefs.keyboardParser = KeyboardParser.ofStandard.rawValue
+      testHandler.ensureKeyboardParser()
+      testHandler.prefs.fetchSuggestionsFromPerceptionOverrideModel = true
+      testSession.resetInputHandler(forceComposerCleanup: true)
+    }
+    [
+      .init(keyArray: ["ㄕㄥ"], value: "生", score: -1),
+      .init(keyArray: ["ㄕㄥ"], value: "甥", score: -2),
+      .init(keyArray: ["ㄕㄥˋ"], value: "聖", score: -2),
+    ].forEach {
+      testHandler.currentLM.insertTemporaryData(unigram: $0, isFiltering: false)
+    }
+    testSession.resetInputHandler(forceComposerCleanup: true)
+    testHandler.prefs.keyboardParser = KeyboardParser.ofHanyuPinyin.rawValue
+    testHandler.ensureKeyboardParser()
+    testHandler.prefs.fetchSuggestionsFromPerceptionOverrideModel = true
+    testHandler.prefs.furiousTypingEnabled = false // 非狂拼（全拼帶調 sheng1＝單鍵 ㄕㄥ）。
+    testHandler.currentLM.syncPrefs()
+
+    // 記憶「(活)→聖(ㄕㄥˋ)」：ㄕㄥˋ 記憶不得注入 ㄕㄥ（第一聲）節點。
+    testHandler.currentLM.memorizePerception(
+      (ngramKey: "(ㄏㄨㄛˊ,活)&(ㄕㄥˋ,聖)", candidate: "聖"),
+      timestamp: Date().timeIntervalSince1970
+    )
+
+    // 打 sheng1 → 組句「生」（非「聖」）。
+    typeSentence("sheng1")
+    _ = testHandler.triageInput(event: KBEvent.KeyEventData(chars: " ", keyCode: 49).asEvent)
+    #expect(testHandler.assembler.assembledSentence.map(\.value) == ["生"])
+
+    // 對照：無記憶時亦為「生」。
+    testSession.switchState(.ofAbortion())
+    testSession.resetInputHandler(forceComposerCleanup: true)
+    clearTestPOM()
+    typeSentence("sheng1")
+    _ = testHandler.triageInput(event: KBEvent.KeyEventData(chars: " ", keyCode: 49).asEvent)
+    #expect(testHandler.assembler.assembledSentence.map(\.value) == ["生"])
+  }
+
   /// 狂拼固化後 POM 建議套用（容錯模式）：空格固化前方聲調桶後，
   /// `retrievePOMSuggestions(apply: true)` 以容錯查詢召回記憶並就地覆寫——組句結果
   /// 由「是嗎」改為記憶的「是媽」。
