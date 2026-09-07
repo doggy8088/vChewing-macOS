@@ -241,6 +241,48 @@ extension MainAssemblyTests {
     #expect(resolvedURL.path == targetURL.standardizedFileURL.path)
   }
 
+  // 單元測試模式下 dataFolderPath() 會提早跳入測試沙盒，無法直接驅動其產品分支；
+  // 故直接測試空值判定函式與合規性驗證器的行為（空字串不得被解讀成 "/" 而誤報失效）。
+
+  @Test
+  func test021_LMMgr_EmptyUserDataFolderSpecIsEffectivelyUnset() {
+    // AppProperty 初次初始化會把空字串預設值寫入 prefs，使「從未指定」看起來像「指定了空路徑」。
+    // 空字串與其補尾斜槓產物 "/" 皆必須視為「未指定」。
+    #expect(LMMgr.userDataFolderPathIsEffectivelyUnset(""))
+    #expect(LMMgr.userDataFolderPathIsEffectivelyUnset("/"))
+    #expect(!LMMgr.userDataFolderPathIsEffectivelyUnset("/Users/Shared/vChewing/"))
+    #expect(!LMMgr.userDataFolderPathIsEffectivelyUnset("~"))
+  }
+
+  @Test
+  func test022_LMMgr_EmptyUserDataFolderSpecSkipsValidityAlert() {
+    LMMgr.resetRecordedPathInvalidityAlerts()
+    defer { LMMgr.resetRecordedPathInvalidityAlerts() }
+    Broadcaster.shared.clearLmMgrDataFolderPathInvalidity()
+
+    // 空值（nil／空字串）＝「尚未指定自訂目錄」：視為合規、不得觸發失效警示。
+    #expect(LMMgr.checkIfSpecifiedUserDataFolderValid(""))
+    #expect(LMMgr.checkIfSpecifiedUserDataFolderValid(nil))
+    #expect(LMMgr.recordedPathInvalidityAlerts.isEmpty)
+
+    // 真實存在且可寫入的目錄依然照常通過。
+    #expect(
+      LMMgr.checkIfSpecifiedUserDataFolderValid(LMMgr.unitTestDataURL(isDefaultFolder: true).path)
+    )
+    #expect(LMMgr.recordedPathInvalidityAlerts.isEmpty)
+  }
+
+  @Test
+  func test023_LMMgr_AppPropertyAutoSeedsEmptyDefaultIntoPrefs() {
+    // 前提驗證：AppProperty 的 init 會在 key 缺席時把預設值寫入 prefs——這使「從未手動指定」
+    // 的 kUserDataFolderSpecified 以空字串形式存在於 prefs，成為被誤讀成 "/" 的來源。
+    let defaults = UserDefaults.current
+    defaults.removeObject(forKey: UserDef.kUserDataFolderSpecified.rawValue)
+    defer { defaults.removeObject(forKey: UserDef.kUserDataFolderSpecified.rawValue) }
+    _ = PrefMgr() // 每次實體化皆會重新觸發所有 @AppProperty 的 seeding。
+    #expect(defaults.string(forKey: UserDef.kUserDataFolderSpecified.rawValue) == "")
+  }
+
   // MARK: - Input Handler Tests.
 
   /// 測試基本的打字組句（不是ㄅ半注音）。
