@@ -99,6 +99,12 @@ extension InputHandlerTests {
     testHandler.prefs.specifyCmdOptCtrlEnterBehavior = 3
     result = handler.commissionByCtrlOptionCommandEnter()
     #expect(result == "⠅⠢⠁⠛⠊⠆⠙⠧⠆⠛⠖⠁")
+    testHandler.prefs.specifyCmdOptCtrlEnterBehavior = 5
+    result = handler.commissionByCtrlOptionCommandEnter()
+    #expect(result == "L!'K*\"DV\"K%'")
+    testHandler.prefs.specifyCmdOptCtrlEnterBehavior = 6
+    result = handler.commissionByCtrlOptionCommandEnter()
+    #expect(result == "K5AGI2DV2G6A")
     vCTestLog("成功完成測試 inputHandler.commissionByCtrlOptionCommandEnter()。")
   }
 
