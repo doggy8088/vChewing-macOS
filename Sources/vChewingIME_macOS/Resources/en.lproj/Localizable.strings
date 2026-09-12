@@ -89,6 +89,9 @@
 "i18n:IME.RAMUsedLabelHeader" = "[PRIVATE MEMORY USAGE]";
 "i18n:InfoMessage.AlreadyLatestVersion" = "You are already using the latest version.";
 "i18n:InfoMessage.AlreadyLatestVersionVChewing" = "You are already using the latest version of vChewing.";
+"i18n:InfoMessage.AutoSwitchedEnglishModeEntered" = "Smart mixed typing: auto-switched to alphanumeric input (vChewing stays active).";
+"i18n:InfoMessage.AutoSwitchedEnglishModeIdleHint" = "After %@ idle seconds, the buffered alphanumeric text will be committed and Chinese input will resume.";
+"i18n:InfoMessage.AutoSwitchedEnglishModeReturnHint" = "Press %@ to return to Chinese input immediately, restoring your unfinished Chinese composition.";
 "i18n:InfoMessage.DefaultsWriteCassettePath" = "defaults write org.atelierInmu.inputmethod.vChewing CassettePath -string \"~/FilePathEndedWithoutTrailingSlash\"";
 "i18n:InfoMessage.DefaultsWriteUserDataFolder" = "defaults write org.atelierInmu.inputmethod.vChewing UserDataFolderSpecified -string \"~/FolderPathEndedWithTrailingSlash/\"";
 "i18n:InfoMessage.DeleteKeyNote" = "Note: The “Delete ⌫” key on Mac keyboard is named as “BackSpace ⌫” here in order to distinguish the real “Delete ⌦” key from full-sized desktop keyboards. If you want to use the real “Delete ⌦” key on a Mac keyboard with no numpad equipped, you have to press “Fn+⌫” instead.";
@@ -351,10 +354,14 @@
 "i18n:UserDef.kAutoCompositeWithLongestPossibleCassetteKey.shortTitle" = "Auto-composite when the longest possible key is formed";
 "i18n:UserDef.kAutoCorrectReadingCombination.description" = "This feature is disabled with mixed Chinese-English typing fallback due to compatibility concerns.";
 "i18n:UserDef.kAutoCorrectReadingCombination.shortTitle" = "Automatically correct reading combinations when typing";
-"i18n:UserDef.kAutoSwitchToAlphanumericalOnConsecutiveErrors.description" = "Under Traditional Chinese typing mode, clear the composition buffer, commit corresponding alphanumeric text, and switch to the ABC input method if consecutive invalid phonetic keys reach the threshold.";
-"i18n:UserDef.kAutoSwitchToAlphanumericalOnConsecutiveErrors.shortTitle" = "Auto-switch to ABC input method upon consecutive typing errors";
-"i18n:UserDef.kConsecutiveTypingErrorsThreshold.description" = "Number of consecutive phonetic error keystrokes before triggering auto-switch to ABC input method (default: 5, range: 3-8).";
+"i18n:UserDef.kAutoSwitchToAlphanumericalOnConsecutiveErrors.description" = "Under Traditional Chinese typing mode, when consecutive invalid phonetic keys reach the threshold, vChewing switches to alphanumeric input without leaving vChewing or changing the system input source: subsequent alphanumeric keystrokes are held in the composition buffer instead of being committed right away. You can return to Chinese input at any time with the exit hotkey (or a Shift tap), restoring your unfinished Chinese composition. Before the threshold is reached, Chinese typing is not affected at all.";
+"i18n:UserDef.kAutoSwitchToAlphanumericalOnConsecutiveErrors.shortTitle" = "Enable smart Chinese/English mixed typing (auto-switch to alphanumeric input upon consecutive typing errors)";
+"i18n:UserDef.kConsecutiveTypingErrorsThreshold.description" = "Number of consecutive phonetic error keystrokes before smart mixed typing auto-switches to alphanumeric input (default: 5, range: 3-8).";
 "i18n:UserDef.kConsecutiveTypingErrorsThreshold.shortTitle" = "Consecutive typing errors threshold:";
+"i18n:UserDef.kAutoSwitchedEnglishModeExitHotkey.description" = "After auto-switching to alphanumeric input, this hotkey immediately returns to Chinese input: the buffered alphanumeric text is discarded, and your unfinished Chinese composition (including half-typed readings) is restored. Esc always works as an exit key regardless of this setting; tapping Shift (if Shift toggling is enabled) works as well.";
+"i18n:UserDef.kAutoSwitchedEnglishModeExitHotkey.shortTitle" = "Hotkey for returning to Chinese input:";
+"i18n:UserDef.kAutoSwitchedEnglishModeIdleTimeout.description" = "After auto-switching to alphanumeric input, if no keystroke occurs within this many seconds, vChewing automatically commits the buffered alphanumeric text and returns to Chinese input. Set 0 to disable the automatic return (in that case you can only return to Chinese input via the hotkey, Enter, or backspacing the buffer empty). Default: 2 seconds.";
+"i18n:UserDef.kAutoSwitchedEnglishModeIdleTimeout.shortTitle" = "Idle seconds before returning to Chinese input:";
 "i18n:UserDef.kBasicKeyboardLayout.description" = "Choose the macOS-level basic keyboard layout. Zhuyin typing and Pinyin typing are now mutually switchable modes: while typing Pinyin, this layout determines the actual characters produced by your keys, so non-QWERTY alphanumerical keyboard layouts apply as well; while typing Zhuyin, keystrokes are translated as if on a standard layout, and the on-screen keyboard is displayed accordingly.";
 "i18n:UserDef.kBasicKeyboardLayout.shortTitle" = "Basic Keyboard Layout:";
 "i18n:UserDef.kBeepSoundPreference.option.0" = "Muted";

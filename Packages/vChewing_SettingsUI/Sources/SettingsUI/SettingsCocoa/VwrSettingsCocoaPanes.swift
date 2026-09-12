@@ -31,6 +31,7 @@ public final class SettingsPanesCocoa {
 
   public let ctlPageAbout = SettingsPanesCocoa.About()
   public let ctlPageGeneral = SettingsPanesCocoa.General()
+  public let ctlPageSmartTyping = SettingsPanesCocoa.SmartTyping()
   public let ctlPageCandidates = SettingsPanesCocoa.Candidates()
   public let ctlPageBehavior = SettingsPanesCocoa.Behavior()
   public let ctlPageOutput = SettingsPanesCocoa.Output()
@@ -46,6 +47,7 @@ public final class SettingsPanesCocoa {
 extension SettingsPanesCocoa {
   public func preload() {
     ctlPageGeneral.loadView()
+    ctlPageSmartTyping.loadView()
     ctlPageCandidates.loadView()
     ctlPageBehavior.loadView()
     ctlPageOutput.loadView()

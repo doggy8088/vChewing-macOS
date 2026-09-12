@@ -315,6 +315,10 @@ public struct BPMFFullMatchTypewriter<Handler: InputHandlerProtocol>: Typewriter
       if let injectedResult = onLexiconMatchFailure?(handler, readingKey, session) {
         return injectedResult
       }
+      // 連續誤鍵偵測：疑似英數鍵入序列中的組字失敗視為誤鍵計入（滿門檻即已進入英數暫存模式）；
+      // 否則屬一般中文組字失敗、下方照常重置計數。
+      let keepConsecutiveTypingErrors = handler.noteCompositionFailureForConsecutiveTypingErrors(input: input)
+      if handler.isAutoEnglishModeActive { return true }
       errorCallback("B49C0979：語彙庫內無「\(readingKey.joined(separator: "/"))」的匹配記錄。")
 
       if prefs.keepReadingUponCompositionError {
@@ -324,11 +328,18 @@ public struct BPMFFullMatchTypewriter<Handler: InputHandlerProtocol>: Typewriter
       }
 
       handler.composer.clear()
-      handler.consecutiveTypingErrors.removeAll()
-      handler.inFlightComposerKeys.removeAll()
+      // 切至 Abortion 狀態會連帶 clear() 重置誤鍵計數；疑似英數序列仍在進行中時須保留。
+      let preservedTypingErrors = handler.consecutiveTypingErrors
+      let preservedChineseStash = handler.autoEnglishChineseStash
       switch handler.assembler.isEmpty {
       case false: session.switchState(handler.generateStateOfInputting())
       case true: session.switchState(State.ofAbortion())
+      }
+      if keepConsecutiveTypingErrors {
+        handler.consecutiveTypingErrors = preservedTypingErrors
+        handler.autoEnglishChineseStash = preservedChineseStash
+      } else {
+        handler.resetConsecutiveTypingErrors()
       }
       return true
     }
@@ -356,8 +367,7 @@ public struct BPMFFullMatchTypewriter<Handler: InputHandlerProtocol>: Typewriter
     let textToCommit = handler.commitOverflownComposition
     handler.retrievePOMSuggestions(apply: true)
     handler.composer.clear()
-    handler.consecutiveTypingErrors.removeAll()
-    handler.inFlightComposerKeys.removeAll()
+    handler.resetConsecutiveTypingErrors() // 組字成功＝確為中文打字，連續誤鍵計數重置。
 
     var inputting = handler.generateStateOfInputting()
     inputting.textToCommit = textToCommit

@@ -338,6 +338,17 @@ extension InputHandlerProtocol {
   )
     -> State {
     furiousHighlightOverride = nil // 高亮覆寫僅供當拍消費（高亮預覽不走本函數）。
+    // 英數暫存模式：組字區顯示「進入模式前的既有組字內容 + 英數暫存內容」，
+    // 順序與鍵入順序一致、亦與遞交結果一致。
+    // 註：模式說明工具提示僅在進入模式時顯示（見 enterAutoEnglishMode），
+    // 避免逐鍵刷新時工具提示視窗反覆閃爍。
+    if let autoEnglishMode, !autoEnglishMode.displayText.isEmpty {
+      let textToDisplay = autoEnglishMode.displayText
+      return State.ofInputting(
+        displayTextSegments: [textToDisplay],
+        cursor: textToDisplay.count
+      )
+    }
     if isConsideredEmptyForNow, !guarded { return State.ofAbortion() }
     restoreBackupCursor() // 只要叫了 Inputting 狀態，就盡可能還原游標備份。
     var segHighlightedAt: Int?
@@ -512,6 +523,11 @@ extension InputHandlerProtocol {
 
   /// 組字區可以投影成 BPMFVS 顯示，但一般遞交流程只能吃原始內容。
   public func committableDisplayText(sansReading: Bool = false) -> String {
+    // 英數暫存模式：可遞交內容 = 進入模式前的既有組字內容 + 英數暫存緩衝區
+    // （組字器與注拼槽於進入該模式時已清空，既有內容已擷取為 chinesePrefix）。
+    // 此路徑主要供 IMK 強制遞交（如客體失焦時的 commitComposition）使用，
+    // 避免暫存內容在模式中途意外流失。
+    if let autoEnglishMode { return autoEnglishMode.displayText }
     let handleAsCodePointInput = currentTypingMethod == .codePoint && !sansReading
     let handleAsRomanNumeralInput = currentTypingMethod == .romanNumerals && !sansReading
     var displayTextSegments: [String] = handleAsCodePointInput || handleAsRomanNumeralInput

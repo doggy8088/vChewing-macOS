@@ -69,6 +69,8 @@ public final class MockInputHandler: @MainActor InputHandlerProtocol {
   public var mixedAlphanumericalBuffer = ""
   public var consecutiveTypingErrors = [String]()
   public var inFlightComposerKeys = [String]()
+  public var autoEnglishMode: AutoEnglishModeState?
+  public var autoEnglishChineseStash: ChineseTypingSnapshot?
   public var furiousTrail = [String]() // 狂拼模式：自動 chop 提交鍵對應的拼音字母 blob trail
   public var furiousHighlightOverride: CandidateInState? // 狂拼 copilot 窗高亮候選（當拍消費）
   public var furiousCoSegmentedOffers = [FuriousCoSegmentedOffer]() // 狂拼 copilot 窗聯合重切（P164）的替代切分 offers
@@ -102,8 +104,6 @@ public final class MockSession: @MainActor SessionCoreProtocol {
   public let id: UUID = .init()
   public var inputHandler: MockInputHandler?
   public var isASCIIMode: Bool = false
-  public var isPassThroughUntilDeactivated: Bool = false
-  public var passThroughUntilDeactivatedTimestamp: Date? = nil
   public var inputMode: Shared.InputMode = .imeModeCHT
   public var clientMitigationLevel: Int = 0
   /// 預設為 nil（候選窗不存在）；測試需要模擬候選窗已顯示時才指派。
@@ -150,8 +150,6 @@ public final class MockSession: @MainActor SessionCoreProtocol {
   }
 
   public func performServerActivation() {
-    isPassThroughUntilDeactivated = false
-    passThroughUntilDeactivatedTimestamp = nil
     if isASCIIMode {
       isASCIIMode = false
     }

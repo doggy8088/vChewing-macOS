@@ -177,6 +177,12 @@ public final class PrefMgr: PrefMgrProtocol, Sendable {
   @AppProperty(userDef: .kConsecutiveTypingErrorsThreshold)
   public var consecutiveTypingErrorsThreshold: Int
 
+  @AppProperty(userDef: .kAutoSwitchedEnglishModeExitHotkey)
+  public var autoSwitchedEnglishModeExitHotkey: Int
+
+  @AppProperty(userDef: .kAutoSwitchedEnglishModeIdleTimeout)
+  public var autoSwitchedEnglishModeIdleTimeout: Int
+
   @AppProperty(userDef: .kAlsoConfirmAssociatedCandidatesByEnter)
   public var alsoConfirmAssociatedCandidatesByEnter: Bool
 
@@ -505,8 +511,14 @@ extension PrefMgr {
     if ![0, 1, 2].contains(preferredRevolverForceLevel) {
       preferredRevolverForceLevel = 2
     }
-    if ![0, 1, 2].contains(spaceKeyBehaviorAgainstICB) {
+    if ![0, 1, 2, 3].contains(spaceKeyBehaviorAgainstICB) {
       spaceKeyBehaviorAgainstICB = 1
+    }
+    if !(0 ... 3).contains(autoSwitchedEnglishModeExitHotkey) {
+      autoSwitchedEnglishModeExitHotkey = 0
+    }
+    if !(0 ... 10).contains(autoSwitchedEnglishModeIdleTimeout) {
+      autoSwitchedEnglishModeIdleTimeout = 2
     }
     migrateDeprecatedSettings()
   }

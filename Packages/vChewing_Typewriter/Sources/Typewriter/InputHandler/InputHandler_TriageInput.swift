@@ -16,14 +16,13 @@ import Foundation
 extension InputHandlerProtocol {
   public func triageInput(event input: InputSignalProtocol) -> Bool {
     guard let session = session else { return false }
-    if session.isPassThroughUntilDeactivated {
-      if let timestamp = session.passThroughUntilDeactivatedTimestamp,
-         Date().timeIntervalSince(timestamp) < 2.0 {
-        return false
-      }
-      session.isPassThroughUntilDeactivated = false
-      session.passThroughUntilDeactivatedTimestamp = nil
+
+    // 連續誤鍵自動切換的英數暫存模式：鍵入一律由該模式專屬分診接管，
+    // 不再進入注音／拼音組字流程。
+    if isAutoEnglishModeActive {
+      return handleAutoEnglishModeInput(input: input)
     }
+
     var state: State { session.state }
     currentLM.syncPrefs()
 
@@ -61,8 +60,8 @@ extension InputHandlerProtocol {
       case .kEscape, .kContextMenu, .kTab, .kDownArrow, .kLeftArrow, .kRightArrow, .kUpArrow,
            .kHome, .kEnd, .kBackSpace, .kWindowsDelete, .kCarriageReturn, .kLineFeed,
            .kSymbolMenuPhysicalKeyIntl, .kSymbolMenuPhysicalKeyJIS:
-        consecutiveTypingErrors.removeAll()
-        inFlightComposerKeys.removeAll()
+        // 導航／編輯類按鍵（含 BackSpace）＝使用者回到中文流程，連續誤鍵計數一律重置。
+        resetConsecutiveTypingErrors()
       default: break
       }
       switch keyCodeType {

@@ -14,6 +14,7 @@ import SwiftUI
 public enum PrefUITabs: String, CaseIterable, Identifiable, Hashable {
   case tabAbout = "About"
   case tabGeneral = "General"
+  case tabSmartTyping = "SmartTyping"
   case tabCandidates = "Candidates"
   case tabBehavior = "Behavior"
   case tabOutput = "Output"
@@ -34,6 +35,7 @@ extension PrefUITabs {
   private static let i18nTable: [String: (Hans: String, Hant: String, Ja: String)] = [
     "About": (Hans: "关于唯音", Hant: "關於唯音", Ja: "アプリ情報"),
     "General": (Hans: "一般设定", Hant: "一般設定", Ja: "一般設定"),
+    "SmartTyping": (Hans: "智能输入", Hant: "智慧輸入", Ja: "スマート入力"),
     "Candidates": (Hans: "选字设定", Hant: "選字設定", Ja: "候補設定"),
     "Behavior": (Hans: "行为设定", Hant: "行為設定", Ja: "作動設定"),
     "Output": (Hans: "输出设定", Hant: "輸出設定", Ja: "出力設定"),
@@ -50,6 +52,9 @@ extension PrefUITabs {
     switch self {
     case .tabAbout: return 0
     case .tabGeneral: return 10
+    // 15：刻意插在 General(10) 與 Candidates(20) 之間，
+    // 以免變更既有頁籤的 cocoaTag（該值會被持久化記錄）。
+    case .tabSmartTyping: return 15
     case .tabCandidates: return 20
     case .tabBehavior: return 30
     case .tabOutput: return 40
@@ -73,6 +78,7 @@ extension PrefUITabs {
     switch self {
     case .tabAbout: VwrSettingsPaneAbout()
     case .tabGeneral: VwrSettingsPaneGeneral()
+    case .tabSmartTyping: VwrSettingsPaneSmartTyping()
     case .tabCandidates: VwrSettingsPaneCandidates()
     case .tabBehavior: VwrSettingsPaneBehavior()
     case .tabOutput: VwrSettingsPaneOutput()
@@ -108,6 +114,8 @@ extension PrefUITabs {
           return "info.circle.fill"
         case .tabGeneral:
           return "wrench.and.screwdriver.fill"
+        case .tabSmartTyping:
+          return "wand.and.stars"
         case .tabCandidates:
           return "filemenu.and.selection"
         case .tabBehavior:
@@ -132,7 +140,14 @@ extension PrefUITabs {
       }()
       return NSImage(systemSymbolName: name, accessibilityDescription: note) ?? NSImage()
     }
-    let legacyName = "PrefToolbar-\(rawValue)"
+    // macOS 13 及更早系統走 Assets 圖檔路徑。新頁籤沒有對應的 PrefToolbar 圖檔，
+    // 借用 Behavior 的圖檔，以免圖示在舊系統下空白。
+    let legacyName: String = {
+      switch self {
+      case .tabSmartTyping: "PrefToolbar-Behavior"
+      default: "PrefToolbar-\(rawValue)"
+      }
+    }()
     let matchedImage = NSImage(named: legacyName) ?? NSImage()
     let newImage = NSImage(size: matchedImage.size)
     newImage.lockFocus()

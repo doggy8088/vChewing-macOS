@@ -217,6 +217,19 @@ extension SessionProtocol {
 
   /// 切換英數模式開關。
   private func toggleAlphanumericalMode(popNotification: Bool = true) {
+    // 連續誤鍵自動切換的英數暫存模式：Shift 單擊視為「切回中文模式」，
+    // 棄置英數暫存內容並還原中文輸入進度，而非切換 isASCIIMode。
+    if let handler = inputHandler, handler.isAutoEnglishModeActive {
+      handler.exitAutoEnglishMode(
+        commitEnglishBuffer: false,
+        restoreComposerStash: true
+      )
+      if popNotification {
+        let status = "i18n:NotificationSwitch.Revolver".i18n
+        SessionHost.shared.notify("i18n:Menu.ChineseInputMode".i18n + "\n" + status)
+      }
+      return
+    }
     if var cplk = ui?.capsLockToggler {
       let oldValue = isASCIIMode
       isASCIIMode.toggle()

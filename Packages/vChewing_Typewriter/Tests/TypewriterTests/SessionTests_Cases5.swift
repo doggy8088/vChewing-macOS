@@ -409,30 +409,98 @@ extension InputHandlerTests.Session {
     #expect(hintUI.status.isShown == false, "PCB 顯示時模式提示應被收起")
   }
 
-  /// 測試連續錯誤自動切換至 ABC 後，重新切回唯音時自動恢復為中文模式。
+  /// 測試連續誤鍵自動切換為英數暫存模式後，於會話層級單擊 Shift 可切回中文模式並還原輸入進度，
+  /// 且不會誤觸 isASCIIMode 切換。
   @Test
-  func test515_ActivationAfterAutoSwitchToABC_ResetsASCIIModeToChinese() throws {
+  func test515_AutoEnglishMode_ShiftTapExitsAndRestoresChineseTyping() throws {
     #expect(testSession.isActivated)
-    InputSession.current = testSession
+    let originalAutoSwitch = testHandler.prefs.autoSwitchToAlphanumericalOnConsecutiveErrors
+    let originalIdleTimeout = testHandler.prefs.autoSwitchedEnglishModeIdleTimeout
+    let originalUI = testSession.ui
+    let originalASCIIMode = testSession.isASCIIMode
+    let originalSharedASCIIMode = InputSession.isASCIIModeForAllClients
     defer {
-      InputSession.isAutoSwitchedToABC = false
-      testSession.isASCIIMode = false
-      InputSession.isASCIIModeForAllClients = false
+      testHandler.prefs.autoSwitchToAlphanumericalOnConsecutiveErrors = originalAutoSwitch
+      testHandler.prefs.autoSwitchedEnglishModeIdleTimeout = originalIdleTimeout
+      testSession.ui = originalUI
+      testSession.isASCIIMode = originalASCIIMode
+      InputSession.isASCIIModeForAllClients = originalSharedASCIIMode
     }
 
-    // 模擬自動切換至 ABC 後的狀態：isASCIIMode == true, isAutoSwitchedToABC == true
-    testSession.isASCIIMode = true
-    InputSession.isAutoSwitchedToABC = true
+    InputSession.current = testSession
+    testHandler.prefs.autoSwitchToAlphanumericalOnConsecutiveErrors = true
+    testHandler.prefs.autoSwitchedEnglishModeIdleTimeout = 2
+    testHandler.autoEnglishMode = nil
+    testHandler.autoEnglishChineseStash = nil
+    testSession.inputMode = .imeModeCHT
+    testSession.isASCIIMode = false
+    testSession.state = .ofEmpty()
+    testSession.resetInputHandler(forceComposerCleanup: true)
 
-    #expect(testSession.isASCIIMode == true)
-    #expect(InputSession.isAutoSwitchedToABC == true)
+    // 1. 以真實會話鍵入 "great"（大千鍵盤下 5 個連續誤鍵）→ 觸發英數暫存模式。
+    typeSentenceOrCandidates("great")
+    #expect(testHandler.isAutoEnglishModeActive)
+    #expect(testHandler.autoEnglishMode?.buffer == "great")
 
-    // 模擬使用者切回唯音：呼叫 performServerActivation
-    testSession.performServerActivation()
+    // 2. 注入會話 UI 替身，模擬使用者單擊 Shift（僅對 Shift 鍵碼回報偵測成功）。
+    let shiftUI = MockSessionUI()
+    shiftUI.shiftKeyUpChecker = ShiftTapDetectorStub(allowedKeyCode: 56)
+    testSession.ui = shiftUI
+    let shiftKeyDown = KBEvent(
+      with: .flagsChanged,
+      modifierFlags: [.shift],
+      timestamp: .init(),
+      windowNumber: 0,
+      characters: "",
+      charactersIgnoringModifiers: "",
+      isARepeat: false,
+      keyCode: 56 // 左 Shift。
+    )
+    let handled = testSession.handleEvent(shiftKeyDown)
 
-    // 驗證 isAutoSwitchedToABC 已被重置為 false，且 isASCIIMode 已自動恢復為 false（中文模式）
-    #expect(InputSession.isAutoSwitchedToABC == false)
+    // 3. Shift 單擊應被視為「切回中文」：英數暫存內容棄置、ㄕ（'g' 鍵）還原，
+    //    且不得誤觸 isASCIIMode。
+    #expect(handled)
+    #expect(!testHandler.isAutoEnglishModeActive)
     #expect(testSession.isASCIIMode == false)
-    #expect(InputSession.isASCIIModeForAllClients == false)
+    #expect(testHandler.composer.consonant.value == "ㄕ")
+    #expect(testHandler.inFlightComposerKeys == ["g"])
+
+    // 4. 切回中文後可立即續接還原的 ㄕ 繼續輸入（"j" = ㄨ → ㄕㄨ），
+    //    證明中文輸入流程已無縫恢復。
+    typeSentenceOrCandidates("j")
+    #expect(testHandler.composer.consonant.value == "ㄕ")
+    #expect(testHandler.composer.semivowel.value == "ㄨ")
+  }
+
+  /// 測試英數暫存模式期間，IMK 強制遞交（如客體失焦時的 commitComposition）
+  /// 會一併遞交英數暫存內容、並結束該模式。
+  @Test
+  func test516_AutoEnglishMode_CommitCompositionFlushesEnglishBuffer() throws {
+    #expect(testSession.isActivated)
+    let originalAutoSwitch = testHandler.prefs.autoSwitchToAlphanumericalOnConsecutiveErrors
+    let originalASCIIMode = testSession.isASCIIMode
+    defer {
+      testHandler.prefs.autoSwitchToAlphanumericalOnConsecutiveErrors = originalAutoSwitch
+      testSession.isASCIIMode = originalASCIIMode
+    }
+
+    InputSession.current = testSession
+    testHandler.prefs.autoSwitchToAlphanumericalOnConsecutiveErrors = true
+    testHandler.autoEnglishMode = nil
+    testHandler.autoEnglishChineseStash = nil
+    testSession.inputMode = .imeModeCHT
+    testSession.isASCIIMode = false
+    testSession.state = .ofEmpty()
+    testSession.resetInputHandler(forceComposerCleanup: true)
+
+    typeSentenceOrCandidates("great")
+    #expect(testHandler.isAutoEnglishModeActive)
+    #expect(testHandler.committableDisplayText() == "great")
+
+    // 模擬客體失焦時 IMK 呼叫 commitComposition：英數暫存內容應被遞交、模式結束。
+    testSession.commitComposition()
+    #expect(!testHandler.isAutoEnglishModeActive)
+    #expect(testSession.state.type == .ofEmpty)
   }
 }

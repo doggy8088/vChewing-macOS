@@ -55,6 +55,8 @@ public protocol InputHandlerProtocol: AnyObject {
   var mixedAlphanumericalBuffer: String { get set } // 混輸暫存 ASCII 緩衝區
   var consecutiveTypingErrors: [String] { get set } // 連續輸入錯誤鍵暫存區
   var inFlightComposerKeys: [String] { get set } // 當前注拼槽對應的鍵入字元暫存區
+  var autoEnglishMode: AutoEnglishModeState? { get set } // 連續誤鍵自動切換之英數暫存模式狀態
+  var autoEnglishChineseStash: ChineseTypingSnapshot? { get set } // 誤鍵序列打斷注拼時的中文進度暫存
   var furiousTrail: [String] { get set } // 狂拼模式：自動 chop／空格固化提交鍵對應的拼音字母 blob trail
   var furiousHighlightOverride: CandidateInState? { get set } // 狂拼 copilot 窗高亮候選（當拍消費）
   var furiousCoSegmentedOffers: [FuriousCoSegmentedOffer] { get set
@@ -434,10 +436,12 @@ extension InputHandlerProtocol {
   public func clearComposerAndCalligrapher() {
     calligrapher.removeAll()
     composer.clear()
-    consecutiveTypingErrors.removeAll()
-    inFlightComposerKeys.removeAll()
+    resetConsecutiveTypingErrors()
     mixedAlphanumericalBuffer.removeAll()
     strCodePointBuffer.removeAll()
+    // 英數暫存模式狀態一併重置（含閒置排程任務）。
+    autoEnglishMode?.idleTask?.cancel()
+    autoEnglishMode = nil
   }
 
   func syncComposerWithMixedAlphanumericalBuffer() {
@@ -1125,26 +1129,9 @@ extension InputHandlerProtocol {
       return true
     }
 
-    // 2d. 聲/介/韻/調 槽位順序違反判定：
-    // 韻母後輸入聲母
-    if !composer.vowel.isEmpty, trialComposer.consonant != composer.consonant {
-      return true
-    }
-    // 韻母後輸入介母
-    if !composer.vowel.isEmpty, trialComposer.semivowel != composer.semivowel {
-      return true
-    }
-    // 介母後輸入聲母
-    if !composer.semivowel.isEmpty, trialComposer.consonant != composer.consonant {
-      return true
-    }
-    // 聲調後輸入聲/介/韻
-    if !composer.intonation.isEmpty,
-       trialComposer.consonant != composer.consonant
-       || trialComposer.semivowel != composer.semivowel
-       || trialComposer.vowel != composer.vowel {
-      return true
-    }
+    // 2d. 音位鍵入順序顛倒（如先 ㄨ 後 ㄙ → ㄙㄨ、前置聲調）**不**視為誤鍵：
+    // Tekkon 本就依音位類型自動歸位，這是中文打字時常見且合法的自動校正情境；
+    // 顛倒後若真組不成合法音節，前面的 2b 已會判定為誤鍵。
 
     // 2e. 破壞既有已鍵入音位判定（例如自動糾錯移除掉已有的介母、韻母或聲母）：
     if !composer.semivowel.isEmpty, trialComposer.semivowel.isEmpty {
@@ -1160,17 +1147,49 @@ extension InputHandlerProtocol {
     return false
   }
 
-  /// 檢查是否需要因「連續鍵入 5 個錯誤鍵」而自動切換至英數模式。
+  /// 重置連續誤鍵偵測的所有暫存（誤鍵序列、注拼槽對應鍵入序列、中文進度 stash）。
+  ///
+  /// 凡是「使用者顯然回到中文打字流程」的事件（BackSpace、方向鍵、Enter、組字成功等）
+  /// 都應呼叫本函式，使誤鍵計數從頭開始。stash 一併清掉，避免之後無 fold 即滿門檻時
+  /// 誤用早先殘留的快照。
+  public func resetConsecutiveTypingErrors() {
+    consecutiveTypingErrors.removeAll()
+    inFlightComposerKeys.removeAll()
+    autoEnglishChineseStash = nil
+  }
+
+  /// 注拼槽當前內容以空格送出時，是否只會得到「注音符號自身」的兜底候選（如 ㄎ → ㄎ）、而非任何漢字。
+  /// 注拼槽為空或該讀音在語彙庫內完全無結果時回傳 false（後者應交由注拼流程照常回報組字失敗）。
+  private var isComposerOnlyResolvableToPhonabetSymbol: Bool {
+    guard !composer.isEmpty,
+          let readingKey = composer.phonabetKeyForQuery(pronounceableOnly: false)
+    else { return false }
+    let unigrams = currentLM.unigramsFor(keyArray: [readingKey])
+    return !unigrams.isEmpty && unigrams.allSatisfy { $0.current == readingKey }
+  }
+
+  /// 連續誤鍵偵測是否適用於當前會話狀態（僅 imeModeCHT、注音鍵盤、非混輸、非 ASCII 模式）。
+  private var isConsecutiveTypingErrorsDetectionApplicable: Bool {
+    guard prefs.autoSwitchToAlphanumericalOnConsecutiveErrors, let session else { return false }
+    return session.inputMode == .imeModeCHT
+      && !session.isASCIIMode
+      && !composer.isPinyinMode
+      && !prefs.mixedAlphanumericalEnabled
+      && currentTypingMethod == .vChewingFactory
+  }
+
+  /// 檢查是否需要因「連續鍵入 N 個錯誤鍵」而自動切換至英數暫存模式。
+  ///
+  /// 門檻未滿之前，本函式僅為**純觀測者**：只記錄鍵入序列與誤鍵狀況，
+  /// 不吞鍵、不清空注拼槽，讓 Tekkon 依既有邏輯（含音位順序自動校正）照常處理按鍵，
+  /// 使中文打字體驗與未啟用本功能時完全一致（打錯了照樣可以 BackSpace 修正、照樣可以重打）。
+  /// 僅在滿門檻的當下才接管該鍵、進入英數暫存模式。
+  /// - Returns: nil = 不攔截、交由後續注拼流程處理；true = 該鍵已被本功能消費。
   public func handleConsecutiveTypingErrorsSwitchIfNeeded(
     input: some InputSignalProtocol
   ) -> Bool? {
-    guard prefs.autoSwitchToAlphanumericalOnConsecutiveErrors,
+    guard isConsecutiveTypingErrorsDetectionApplicable,
           let session = session,
-          session.inputMode == .imeModeCHT,
-          !session.isASCIIMode,
-          !composer.isPinyinMode,
-          !prefs.mixedAlphanumericalEnabled,
-          currentTypingMethod == .vChewingFactory,
           !input.isCommandHeld, !input.isControlHeld, !input.isOptionHeld,
           !input.isEnter, !input.isTab, !input.isEsc,
           !input.isBackSpace, !input.isDelete,
@@ -1182,8 +1201,7 @@ extension InputHandlerProtocol {
         || input.isCursorBackward || input.isCursorForward || input.isUp || input.isDown
         || input.isLeft || input.isRight || input.isPageUp || input.isPageDown || input.isHome || input.isEnd
       {
-        consecutiveTypingErrors.removeAll()
-        inFlightComposerKeys.removeAll()
+        resetConsecutiveTypingErrors()
       }
       return nil
     }
@@ -1191,105 +1209,111 @@ extension InputHandlerProtocol {
     if let keyCodeType = KeyCode(rawValue: input.keyCode) {
       switch keyCodeType {
       case .kSymbolMenuPhysicalKeyIntl, .kSymbolMenuPhysicalKeyJIS, .kContextMenu:
-        consecutiveTypingErrors.removeAll()
-        inFlightComposerKeys.removeAll()
+        resetConsecutiveTypingErrors()
         return nil
       default: break
       }
     }
 
     let threshold = max(3, prefs.consecutiveTypingErrorsThreshold)
+    // 已累積 >= 2 個鍵的誤鍵序列，視為「疑似英數鍵入序列」。
+    let isSuspectedAlphanumericalRun = consecutiveTypingErrors.count >= 2
 
-    // 當已處於連續錯誤狀態（已累積 >= 2 個錯誤鍵）時，Space 被視為英數輸入的一環（如 "cd .."、"ls -la"、"git status"），
-    // 應計入連續鍵擊並阻斷注音一聲/送字；若未處於錯誤狀態，Space 仍為正常的注音一聲或送字。
+    // 疑似英數鍵入序列中的 Space：
+    // 注拼槽內容可能組出漢字、或根本組不出讀音時，照常交由注拼流程處理
+    // （組得出漢字＝其實是中文、計數重置；組不出讀音則照常提示錯誤，
+    // 並由 noteCompositionFailureForConsecutiveTypingErrors 計入序列）。
+    // 注拼槽為空、或只剩「單一注音符號自身」的兜底候選（如 ㄎ␣ → ㄎ）時，
+    // 該空格在正常流程下不會產生漢字，視為英數空格直接計入序列並吞掉（如 "cd .."）。
     if input.isSpace {
-      if consecutiveTypingErrors.count >= 2 {
-        consecutiveTypingErrors.append(" ")
-        composer.clear()
-        calligrapher.removeAll()
-        inFlightComposerKeys.removeAll()
-        if consecutiveTypingErrors.count >= threshold {
-          return commitConsecutiveErrorsAndSwitchToABC(session: session)
-        }
-        return true
-      } else {
-        consecutiveTypingErrors.removeAll()
-        inFlightComposerKeys.removeAll()
+      guard isSuspectedAlphanumericalRun else {
+        resetConsecutiveTypingErrors()
         return nil
       }
+      guard composer.isEmpty || isComposerOnlyResolvableToPhonabetSymbol else { return nil }
+      consecutiveTypingErrors.append(" ")
+      if consecutiveTypingErrors.count >= threshold {
+        return enterAutoEnglishMode(session: session)
+      }
+      return true
     }
 
     var inputText = (input.inputTextIgnoringModifiers ?? input.text)
     inputText = inputText.lowercased().applyingTransformFW2HW(reverse: false)
     let charToRecord = input.text.isEmpty ? inputText : input.text
+    // 該鍵是否為當前鍵盤排列內的注音鍵（Tekkon 吃得下）。
+    // 吃得下的鍵一律放行流入注拼槽（非侵入）；吃不下的鍵在誤鍵序列中就地吞掉，
+    // 避免流入標點處理而在組字器留下副作用（之後進入英數暫存模式時會與暫存內容重複）。
+    let isPhoneticKey = composer.inputValidityCheck(charStr: inputText)
 
-    // 當已處於連續錯誤狀態（已累積 >= 2 個鍵）時，後續無論是字母、標點符號或數字，
-    // 皆視為正在輸入英數字串（如 "cd .." 中的 "." 與 "/"、"git log" 中的字母），持續累積直到滿門檻自動切換。
-    if consecutiveTypingErrors.count >= 2 {
+    // 疑似英數鍵入序列中，後續無論字母、標點或數字皆計入序列（如 "cd .." 的 "."、"git log" 的字母）；
+    // 但**僅在該鍵本身亦為誤鍵時才檢查門檻**——如此一來，組字失敗後使用者直接重打的合法注音續鍵
+    // （例如 "jn. " 組不出「搜」後重打 "n. "）不會被推入英數暫存模式，而是照常組出漢字（組字成功即重置計數）。
+    if isSuspectedAlphanumericalRun {
+      let isError = isConsideredPhoneticErrorKey(input: input, inputText: inputText)
       consecutiveTypingErrors.append(charToRecord)
-      composer.clear()
-      calligrapher.removeAll()
-      inFlightComposerKeys.removeAll()
-      if consecutiveTypingErrors.count >= threshold {
-        return commitConsecutiveErrorsAndSwitchToABC(session: session)
+      if isError, consecutiveTypingErrors.count >= threshold {
+        return enterAutoEnglishMode(session: session)
       }
-      return true
+      return isPhoneticKey ? nil : true
     }
 
-    // 若尚未處於錯誤狀態（累積小於 2 個鍵），且該鍵是合法標點符號按鍵（詞庫中有定義標點符號），
-    // 則視為正常的中文標點輸入，不判定為錯誤。
+    // 尚未處於疑似序列時，合法標點符號按鍵（詞庫中有定義）視為正常的中文標點輸入，不判定為錯誤。
     if let puncKeys = punctuationQueryStrings(input: input),
        puncKeys.contains(where: { currentLM.hasUnigramsFor(keyArray: [$0]) })
     {
-      consecutiveTypingErrors.removeAll()
-      inFlightComposerKeys.removeAll()
+      resetConsecutiveTypingErrors()
       return nil
     }
 
-    let isError = isConsideredPhoneticErrorKey(input: input, inputText: inputText)
-
-    if isError {
-      // 若在累積錯誤鍵之前注拼槽內已有尚未固化／提交的鍵入字元（如合法的聲母或介母，但因後續鍵入破壞注音結構而判定為英文打字），
-      // 將這些尚未成為完整漢字的按鍵一併作為錯誤鍵序列納入
-      if !inFlightComposerKeys.isEmpty {
-        consecutiveTypingErrors = inFlightComposerKeys + [charToRecord]
-        inFlightComposerKeys.removeAll()
-      } else {
-        consecutiveTypingErrors.append(charToRecord)
-      }
-      composer.clear()
-      calligrapher.removeAll()
-      if consecutiveTypingErrors.count >= threshold {
-        return commitConsecutiveErrorsAndSwitchToABC(session: session)
-      }
-      return true
-    } else {
+    guard isConsideredPhoneticErrorKey(input: input, inputText: inputText) else {
+      // 合法的注音續鍵：記錄為「當前注拼槽對應的鍵入序列」，供之後判定為誤鍵時一併折入序列。
       if composer.isEmpty {
         inFlightComposerKeys = [charToRecord]
         consecutiveTypingErrors = [charToRecord]
       } else {
         inFlightComposerKeys.append(charToRecord)
       }
+      return nil
     }
-    return nil
+
+    // 判定為誤鍵：若在此之前注拼槽內已有尚未固化／提交的鍵入字元（如合法的聲母或介母，
+    // 但因本鍵破壞注音結構而判定為英文打字），將這些按鍵一併折入誤鍵序列；
+    // 同時快照注拼槽內容，供英數暫存模式以熱鍵切回中文時還原「拼到一半的讀音」。
+    if !inFlightComposerKeys.isEmpty {
+      autoEnglishChineseStash = .init(
+        composer: composer,
+        inFlightComposerKeys: inFlightComposerKeys,
+        assemblerSnapshot: nil
+      )
+      consecutiveTypingErrors = inFlightComposerKeys + [charToRecord]
+      inFlightComposerKeys.removeAll()
+    } else {
+      consecutiveTypingErrors.append(charToRecord)
+    }
+    if consecutiveTypingErrors.count >= threshold {
+      return enterAutoEnglishMode(session: session)
+    }
+    return isPhoneticKey ? nil : true
   }
 
-  @discardableResult
-  private func commitConsecutiveErrorsAndSwitchToABC(session: Session) -> Bool {
-    let textToCommit = consecutiveTypingErrors.joined()
-    consecutiveTypingErrors.removeAll()
-    inFlightComposerKeys.removeAll()
-    composer.clear()
-    calligrapher.removeAll()
-    assembler.clear()
-    session.switchState(State.ofCommitting(textToCommit: textToCommit))
-    let switched = SessionHost.shared.switchToSystemABCInputSource()
-    if switched {
-      session.isPassThroughUntilDeactivated = true
-      session.passThroughUntilDeactivatedTimestamp = Date()
-      InputSession.isAutoSwitchedToABC = true
-    } else {
-      session.isASCIIMode = true
+  /// 注拼槽以確認鍵（Space、聲調鍵等）組不出讀音時，由注拼流程呼叫。
+  ///
+  /// 若當前已處於疑似英數鍵入序列，該次組字失敗視為誤鍵：Space 計入序列
+  /// （其餘鍵已在 `handleConsecutiveTypingErrorsSwitchIfNeeded` 計入），並檢查是否滿門檻。
+  /// 否則視為一般的中文組字失敗，交由呼叫端照常重置計數。
+  /// - Returns: true = 計數應保留（呼叫端不得重置）；若因此進入英數暫存模式，呼叫端應直接回傳 true。
+  ///   false = 未計入。
+  public func noteCompositionFailureForConsecutiveTypingErrors(
+    input: some InputSignalProtocol
+  ) -> Bool {
+    guard isConsecutiveTypingErrorsDetectionApplicable, let session,
+          !input.isEnter, !input.isCommandHeld, !input.isControlHeld, !input.isOptionHeld,
+          consecutiveTypingErrors.count >= 2
+    else { return false }
+    if input.isSpace { consecutiveTypingErrors.append(" ") }
+    if consecutiveTypingErrors.count >= max(3, prefs.consecutiveTypingErrorsThreshold) {
+      enterAutoEnglishMode(session: session)
     }
     return true
   }

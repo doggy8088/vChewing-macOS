@@ -74,6 +74,21 @@ final class MockSessionUI: SessionUIProtocol {
   var candidateUI: (any CtlCandidateProtocol)?
 }
 
+/// 僅在指定鍵碼出現時回報 Shift 單擊的偵測器替身。
+final class ShiftTapDetectorStub: ShiftKeyUpCheckerProtocol, @unchecked Sendable {
+  var toggleWithLShift: Bool = true
+  var toggleWithRShift: Bool = true
+  let allowedKeyCode: UInt16
+
+  init(allowedKeyCode: UInt16) {
+    self.allowedKeyCode = allowedKeyCode
+  }
+
+  func check(_ event: some InputSignalProtocol) -> Bool {
+    event.keyCode == allowedKeyCode
+  }
+}
+
 // MARK: - MockTooltipUI
 
 /// `TooltipUIProtocol` 替身：記錄顯示內容、次數與座標。

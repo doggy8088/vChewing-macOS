@@ -83,6 +83,8 @@ nonisolated public enum UserDef: String, CaseIterable, Identifiable, Sendable {
   case kAutoCorrectReadingCombination = "AutoCorrectReadingCombination"
   case kAutoSwitchToAlphanumericalOnConsecutiveErrors = "AutoSwitchToAlphanumericalOnConsecutiveErrors"
   case kConsecutiveTypingErrorsThreshold = "ConsecutiveTypingErrorsThreshold"
+  case kAutoSwitchedEnglishModeExitHotkey = "AutoSwitchedEnglishModeExitHotkey"
+  case kAutoSwitchedEnglishModeIdleTimeout = "AutoSwitchedEnglishModeIdleTimeout"
   case kReadingNarrationCoverage = "ReadingNarrationCoverage"
   case kAlsoConfirmAssociatedCandidatesByEnter = "AlsoConfirmAssociatedCandidatesByEnter"
   case kKeepReadingUponCompositionError = "KeepReadingUponCompositionError"
@@ -378,6 +380,8 @@ nonisolated extension UserDef {
     case .kSpecifyShiftBackSpaceKeyBehavior: 0 ... 2
     case .kUpperCaseLetterKeyBehavior: 0 ... 4
     case .kConsecutiveTypingErrorsThreshold: 3 ... 8
+    case .kAutoSwitchedEnglishModeExitHotkey: 0 ... 3
+    case .kAutoSwitchedEnglishModeIdleTimeout: 0 ... 10
     case .kReadingNarrationCoverage: 0 ... 2
     case .kRomanNumeralOutputFormat: 0 ... 3
     case .kSpecifyCmdOptCtrlEnterBehavior: 0 ... 6
@@ -504,6 +508,8 @@ nonisolated extension UserDef {
     case .kAutoCorrectReadingCombination: return .bool(true)
     case .kAutoSwitchToAlphanumericalOnConsecutiveErrors: return .bool(true)
     case .kConsecutiveTypingErrorsThreshold: return .integer(5)
+    case .kAutoSwitchedEnglishModeExitHotkey: return .integer(0)
+    case .kAutoSwitchedEnglishModeIdleTimeout: return .integer(2)
     case .kReadingNarrationCoverage: return .integer(0)
     case .kAlsoConfirmAssociatedCandidatesByEnter: return .bool(false)
     case .kKeepReadingUponCompositionError: return .bool(false)
@@ -921,6 +927,28 @@ nonisolated extension UserDef {
         userDef: self,
         shortTitle: "i18n:UserDef.kConsecutiveTypingErrorsThreshold.shortTitle",
         description: "i18n:UserDef.kConsecutiveTypingErrorsThreshold.description",
+        options: {
+          var result = [Int: String]()
+          guard let validNumeralValueRange else { return nil }
+          validNumeralValueRange.forEach { result[$0] = $0.description }
+          return result.isEmpty ? nil : result
+        }()
+      )
+      case .kAutoSwitchedEnglishModeExitHotkey: return .init(
+        userDef: self,
+        shortTitle: "i18n:UserDef.kAutoSwitchedEnglishModeExitHotkey.shortTitle",
+        description: "i18n:UserDef.kAutoSwitchedEnglishModeExitHotkey.description",
+        options: [
+          0: "Esc",
+          1: "⌃Space",
+          2: "⌥Enter",
+          3: "⌃Enter",
+        ]
+      )
+      case .kAutoSwitchedEnglishModeIdleTimeout: return .init(
+        userDef: self,
+        shortTitle: "i18n:UserDef.kAutoSwitchedEnglishModeIdleTimeout.shortTitle",
+        description: "i18n:UserDef.kAutoSwitchedEnglishModeIdleTimeout.description",
         options: {
           var result = [Int: String]()
           guard let validNumeralValueRange else { return nil }

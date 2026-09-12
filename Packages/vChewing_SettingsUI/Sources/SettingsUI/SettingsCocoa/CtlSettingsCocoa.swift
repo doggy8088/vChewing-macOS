@@ -608,6 +608,7 @@ extension CtlSettingsCocoa {
     switch tab {
     case .tabAbout: return panes.ctlPageAbout.view
     case .tabGeneral: return panes.ctlPageGeneral.view
+    case .tabSmartTyping: return panes.ctlPageSmartTyping.view
     case .tabCandidates: return panes.ctlPageCandidates.view
     case .tabBehavior: return panes.ctlPageBehavior.view
     case .tabOutput: return panes.ctlPageOutput.view
