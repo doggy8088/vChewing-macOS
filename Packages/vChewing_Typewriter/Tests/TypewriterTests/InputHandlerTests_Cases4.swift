@@ -1457,30 +1457,43 @@ extension InputHandlerTests {
       keyCode: 18
     ).asEvent
 
+    testSession.recentCommissions.removeAll()
+
     // 全形標點模式（半形標點關閉）：Alt(+Shift)+數字鍵仍由數字輸入功能攔截。
     testHandler.prefs.halfWidthPunctuationEnabled = false
     #expect(
       testHandler.triageInput(event: optOneEvent),
       "Alt+數字鍵在全形標點模式下應被數字輸入功能攔截"
     )
+    // Alt+數字鍵：遞交半形數字。
+    #expect(testSession.recentCommissions.last == "1")
+    #expect(testSession.state.type == .ofEmpty || testSession.state.type == .ofCommitting)
     testSession.switchState(.ofEmpty())
     #expect(
       testHandler.triageInput(event: optShiftOneEvent),
       "Alt+Shift+數字鍵在全形標點模式下應被數字輸入功能攔截"
     )
+    // Alt+Shift+數字鍵：遞交全形數字。
+    #expect(testSession.recentCommissions.last == "１")
+    #expect(testSession.state.type == .ofEmpty || testSession.state.type == .ofCommitting)
 
-    // 半形標點模式：數字輸入功能被 bypass，按鍵不得被攔截（透傳給鍵盤佈局）。
+    // 半形標點模式：數字輸入功能被 bypass，按鍵不得被攔截（透傳給鍵盤佈局）、亦不得遞交任何字元。
     testSession.switchState(.ofEmpty())
     testHandler.prefs.halfWidthPunctuationEnabled = true
+    let commitCountBeforeBypass = testSession.recentCommissions.count
     #expect(
       !testHandler.triageInput(event: optOneEvent),
       "半形標點模式下 Alt+數字鍵不得被數字輸入功能攔截"
     )
+    #expect(testSession.recentCommissions.count == commitCountBeforeBypass)
+    #expect(testSession.state.type == .ofEmpty || testSession.state.type == .ofCommitting)
     testSession.switchState(.ofEmpty())
     #expect(
       !testHandler.triageInput(event: optShiftOneEvent),
       "半形標點模式下 Alt+Shift+數字鍵不得被數字輸入功能攔截"
     )
+    #expect(testSession.recentCommissions.count == commitCountBeforeBypass)
+    #expect(testSession.state.type == .ofEmpty || testSession.state.type == .ofCommitting)
 
     testHandler.prefs.halfWidthPunctuationEnabled = false
   }

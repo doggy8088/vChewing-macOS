@@ -98,7 +98,6 @@ public final class MockSession: @MainActor SessionCoreProtocol {
   public typealias Handler = MockInputHandler
 
   public let id: UUID = .init()
-  public var state: IMEState = .init()
   public var inputHandler: MockInputHandler?
   public var isASCIIMode: Bool = false
   public var clientMitigationLevel: Int = 0
@@ -114,6 +113,14 @@ public final class MockSession: @MainActor SessionCoreProtocol {
   public var recentCommissions = [String]()
   public var clientAccentColor: HSBA?
   public var trieCacheFlushHandler: (() -> ())?
+
+  public var state: IMEState = .init() {
+    didSet {
+      // 令「跟隨 Session 候選清單」的模擬選字窗即時同步：候選內容變更時把高亮重設回首項，
+      // 與生產端選字窗於資料重載時的行為一致。未安裝控制器、或控制器未跟隨時為空操作。
+      mockCandidateController?.syncCandidateList(state.candidates)
+    }
+  }
 
   public var isCandidateState: Bool { state.type == .ofCandidates }
 
@@ -187,6 +194,30 @@ public final class MockSession: @MainActor SessionCoreProtocol {
   // MARK: - CtlCandidateDelegate conformance
 
   public func candidateController() -> CtlCandidateProtocol? { mockCandidateController }
+
+  /// 安裝一個可見、且會跟隨當前 Session 候選清單的模擬選字窗控制器。
+  /// 控制器的 `candidateCount` 會隨 `state.candidates` 即時更新，故可以真實進行候選導航
+  /// （方向鍵、選字鍵、翻頁），用於測試「必須經由選字窗完成」的流程。
+  /// - Parameters:
+  ///   - visible: 是否讓控制器處於可見狀態（`handleCandidate` 需要）。
+  ///   - capacityPerPage: 每頁可容納的候選數量；在生產端選字窗即每行容量，對應
+  ///     `selectionKeys` 的字元數（預設值為 `prefs.candidateKeys`，即 "123456"）。
+  /// - Returns: 安裝完成的控制器，供測試斷言導航結果。
+  @discardableResult
+  public func installMockCandidateController(
+    visible: Bool = true,
+    capacityPerPage: Int = 9
+  )
+    -> MockCandidateController {
+    let controller = MockCandidateController(
+      visible: visible, capacityPerPage: capacityPerPage
+    )
+    controller.delegate = self
+    controller.tracksSessionCandidateList = true
+    controller.syncCandidateList(state.candidates)
+    mockCandidateController = controller
+    return controller
+  }
 
   public func candidatePairs(conv _: Bool) -> [CandidateInState] {
     if !state.isCandidateContainer || state.candidates.isEmpty { return [] }
@@ -283,11 +314,14 @@ public final class MockSession: @MainActor SessionCoreProtocol {
     case .ofSymbolTable where (0 ..< state.node.members.count).contains(theIndex):
       let node = state.node.members[theIndex]
       if node.members.isEmpty {
-        state.data.displayedText = node.name
+        // 與生產端 InputSession_Delegates 對應：葉節點以「顯示區段」承載預覽文字。
+        state.data.displayTextSegments = [node.name]
         state.data.cursor = node.name.count
+        state.data.marker = state.data.cursor
       } else {
-        state.data.displayedText.removeAll()
+        state.data.displayTextSegments.removeAll()
         state.data.cursor = 0
+        state.data.marker = 0
       }
       updateCompositionBufferDisplay()
     default: break
@@ -344,45 +378,123 @@ public final class MockSession: @MainActor SessionCoreProtocol {
 // MARK: - MockCandidateController
 
 /// 專門用於單元測試的模擬候選窗控制器。
-/// 僅用來讓 `handleCandidate` 認定候選窗處於可見狀態，不實際處理任何翻頁或移動高亮操作。
+///
+/// 預設（未設定候選數量時）僅用來讓 `handleCandidate` 認定候選窗處於可見狀態，
+/// 所有導航操作一律回傳 `false`、亦不移動高亮，與既有測試行為一致。
+/// 一旦候選數量已知（`candidateCount > 0`，或由 `MockSession` 安裝後持續跟隨候選清單），
+/// 導航操作便會實際移動 `highlightedIndex`，用於測試必須經由選字窗完成的流程。
 public final class MockCandidateController: CtlCandidateProtocol {
   // MARK: Lifecycle
 
-  public init(visible: Bool = true) {
+  public init(
+    visible: Bool = true,
+    candidateCount: Int = 0,
+    capacityPerPage: Int = 9
+  ) {
     self.visible = visible
+    self.candidateCount = candidateCount
+    self.capacityPerPage = capacityPerPage
   }
 
   // MARK: Public
 
   public weak var delegate: (any CtlCandidateDelegate)?
-  public var highlightedIndex: Int = 0
   public var visible: Bool
   public var expanded: Bool = false
   public var currentLayout: UILayoutOrientation = .horizontal
   /// 記錄高亮導航（highlightNext/Previous）被呼叫的次數，供測試斷言導航事件。
   public private(set) var highlightNavigationCount = 0
+  /// 候選總數。為 0 時視為「未知」，所有導航操作一律回傳 `false`（與既有行為一致）。
+  public var candidateCount: Int = 0
+  /// 每頁可容納的候選數量；在生產端選字窗即「每行候選容量」（`selectionKeys` 的字元數），
+  /// 故亦決定「翻一行」的位移量，以及選字鍵索引到候選總索引的換算。
+  public var capacityPerPage: Int = 9
+  /// 當前頁索引，於導航時隨高亮位置推算。
+  public var pageIndex: Int = 0
+  /// 是否跟隨 `MockSession.state.candidates`。由 `installMockCandidateController` 開啟。
+  public var tracksSessionCandidateList: Bool = false
 
-  public func showNextPage() -> Bool { false }
-  public func showPreviousPage() -> Bool { false }
-  public func showNextLine() -> Bool { false }
-  public func showPreviousLine() -> Bool { false }
+  /// 當前高亮候選索引。變更時同步通知 `delegate`。
+  public var highlightedIndex: Int = 0 {
+    didSet {
+      guard highlightedIndex != oldValue else { return }
+      delegate?.candidatePairHighlightChanged(at: highlightedIndex)
+    }
+  }
+
+  /// 依當前候選清單同步內部狀態。
+  /// 僅在 `tracksSessionCandidateList` 為真時生效；候選內容有變化時，
+  /// 會把高亮與頁索引重設回首項（對應生產端選字窗 `reloadData` 的行為）。
+  public func syncCandidateList(_ candidates: [CandidateInState]) {
+    guard tracksSessionCandidateList else { return }
+    candidateCount = candidates.count
+    let newValues = candidates.map(\.value)
+    guard newValues != lastSyncedCandidateValues else { return }
+    lastSyncedCandidateValues = newValues
+    pageIndex = 0
+    highlightedIndex = 0
+  }
+
+  public func showNextPage() -> Bool { moveHighlight(by: max(capacityPerPage, 1)) }
+  public func showPreviousPage() -> Bool { moveHighlight(by: -max(capacityPerPage, 1)) }
+  public func showNextLine() -> Bool { moveToNeighborLine(isBackward: false) }
+  public func showPreviousLine() -> Bool { moveToNeighborLine(isBackward: true) }
   public func highlightNextCandidate() -> Bool {
     highlightNavigationCount += 1
-    return false
+    return moveHighlight(by: 1)
   }
 
   public func highlightPreviousCandidate() -> Bool {
     highlightNavigationCount += 1
-    return false
+    return moveHighlight(by: -1)
   }
 
-  public func candidateIndexAtKeyLabelIndex(_ index: Int) -> Int? { index }
+  /// 依當前高亮所在的行，將選字鍵的行內索引換算為候選總索引。
+  /// 候選數量未知（= 0）時，維持既有行為直接回傳 `index`。
+  public func candidateIndexAtKeyLabelIndex(_ index: Int) -> Int? {
+    guard candidateCount > 0 else { return index }
+    let candidate = currentLine * max(capacityPerPage, 1) + index
+    guard (0 ..< candidateCount).contains(candidate) else { return nil }
+    return candidate
+  }
+
   public func set(
     windowTopLeftPoint _: CGPoint,
     bottomOutOfScreenAdjustmentHeight _: Double,
     useGCD _: Bool,
     animated _: Bool
   ) {}
+
+  // MARK: Private
+
+  /// 已同步過的候選值清單（用於偵測選字窗資料是否真的換了一批內容）。
+  private var lastSyncedCandidateValues: [String]?
+
+  /// 當前高亮所在的「行」（行內容量為 `capacityPerPage`）。
+  private var currentLine: Int { highlightedIndex / max(capacityPerPage, 1) }
+
+  /// 依位移量移動高亮；超出範圍時不移動並回傳 `false`。
+  private func moveHighlight(by offset: Int) -> Bool {
+    guard candidateCount > 0 else { return false }
+    let target = highlightedIndex + offset
+    guard (0 ..< candidateCount).contains(target) else { return false }
+    highlightedIndex = target
+    pageIndex = currentLine
+    return true
+  }
+
+  /// 翻到相鄰的行（保留行內位置）；已在首/末行時不移動並回傳 `false`。
+  private func moveToNeighborLine(isBackward: Bool) -> Bool {
+    guard candidateCount > 0 else { return false }
+    let step = max(capacityPerPage, 1)
+    let subIndex = highlightedIndex % step
+    let targetLine = currentLine + (isBackward ? -1 : 1)
+    let target = targetLine * step + subIndex
+    guard targetLine >= 0, (0 ..< candidateCount).contains(target) else { return false }
+    highlightedIndex = target
+    pageIndex = currentLine
+    return true
+  }
 }
 
 // MARK: - MockSpeechNarrator

@@ -104,8 +104,12 @@ extension InputHandlerTests {
     }
     let currentNodeValue = nodesPriorToCandidateSelection[nodeIndex]
     let cursorPriorToCandidateSelection = testHandler.assembler.cursor
+    // 安裝可見、且會跟隨候選清單的模擬選字窗，讓選取實際經由選字窗的選字鍵完成。
+    testSession.installMockCandidateController()
+    defer { testSession.mockCandidateController = nil }
     _ = testHandler.triageInput(event: KBEvent.KeyEventData.dataArrowDown.asEvent)
     #expect(testSession.state.type == .ofCandidates)
+    #expect(testSession.mockCandidateController?.visible == true)
     let candidateValues = testSession.state.candidates.map { $0.value }
     #expect(!(candidateValues.isEmpty))
     let targetCandidate = candidateValues.first { $0 != currentNodeValue } ?? currentNodeValue
@@ -115,7 +119,9 @@ extension InputHandlerTests {
     }
     let selectionKeys = Array(testSession.selectionKeys)
     #expect(selectionKeys.count > candidateIndex)
-    testSession.candidatePairSelectionConfirmed(at: candidateIndex) // 「年終」
+    // 以選字鍵選取候選（此處的候選即「年終」）。
+    let selectionEvent = KBEvent.KeyEventData(chars: String(selectionKeys[candidateIndex])).asEvent
+    #expect(testHandler.triageInput(event: selectionEvent))
     let nodesAfterSelectingCandidate = testHandler.assembler.assembledSentence.values
     #expect(nodesAfterSelectingCandidate.count == nodesPriorToCandidateSelection.count)
     #expect(nodesAfterSelectingCandidate[nodeIndex] == targetCandidate)

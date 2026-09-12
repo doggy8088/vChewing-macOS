@@ -42,28 +42,47 @@ extension InputHandlerTests {
     #expect(testSession.recentCommissions.joined() == "優跌能留意旅方")
   }
 
-  /// 測試基本的逐字選字（ㄅ半注音）。
+  /// 測試基本的逐字選字（ㄅ半注音）：完整打完「幽蝶能留一縷芳」。
   ///
-  /// 注意：Typewriter Tests 並無測試選字窗行為的條件。
-  /// SCPC 打字的行為處理過程高度強調選字窗的參與，所以此處僅測試打一個字。
-  /// 完整測試需在 MainAssembly 測試進行。
+  /// 逐字選字的行為高度依賴選字窗的參與（方向鍵導航、選字鍵選取、以新讀音首鍵
+  /// 自動確認當前高亮候選），所以此處安裝會實際導航的模擬選字窗控制器。
   @Test
   func test_IH102_BasicSCPCTyping() throws {
-    guard let testHandler else {
-      Issue.record("testHandler is nil.")
+    guard let testHandler, let testSession else {
+      Issue.record("testHandler and testSession at least one of them is nil.")
       return
     }
     testHandler.prefs.useSCPCTypingMode = true
     clearTestPOM()
-    vCTestLog("測試逐字選字：優")
-    testHandler.clear()
-    typeSentence("u. ") // 打「優」字的讀音：「ㄧㄡ」，最後空格是陰平聲調。
-    let resultText1 = generateDisplayedText()
+    vCTestLog("測試逐字選字：幽蝶能留一縷芳")
+    testSession.resetInputHandler(forceComposerCleanup: true)
+    // 安裝可見、且會跟隨候選清單的模擬選字窗，讓選字流程得以如生產環境般進行。
+    // 每行候選容量為 6：對應生產端 `prefs.candidateKeys` 的預設值 "123456"。
+    testSession.installMockCandidateController(capacityPerPage: 6)
+    defer { testSession.mockCandidateController = nil }
+
+    func pressArrowDown(_ count: Int = 1) {
+      (0 ..< count).forEach { _ in
+        _ = testHandler.triageInput(event: KBEvent.KeyEventData.nextCandidateEvent.asEvent)
+      }
+    }
+
+    typeSentence("u. 3")
+    typeSentence("2u,62")
+    typeSentence("s/6")
+    typeSentence("xu.63")
+    typeSentence("u4")
+    pressArrowDown(3)
+    typeSentence("3")
+    typeSentence("xm3")
+    pressArrowDown()
+    typeSentence("1")
+    typeSentence("z; ")
+    typeSentence("2")
+
+    let resultText1 = testSession.recentCommissions.joined()
     vCTestLog("- // 組字結果：\(resultText1)")
-    #expect(!resultText1.isEmpty)
-    let candidates = testHandler.generateArrayOfCandidates()
-    #expect(resultText1.contains("優") || candidates.map { $0.value }.contains("優"))
-    // 測試到此為止，於 MainAssembly 的同名測試繼續。
+    #expect(resultText1 == "幽蝶能留一縷芳")
   }
 
   /// 測試 inputHandler.commissionByCtrlOptionCommandEnter()。
@@ -418,6 +437,11 @@ extension InputHandlerTests {
     typeSentence(",,,")
     #expect(testHandler.calligrapher == ",,,")
 
+    // 磁帶快速片語的候選清單應已產生，且全為單字元候選（`,,,` 對應一組單字候選）。
+    let initialCandidates = testSession.state.candidates.map(\.value)
+    #expect(!initialCandidates.isEmpty)
+    #expect(initialCandidates.allSatisfy { $0.count == 1 })
+
     guard let quickPhraseKey = testHandler.currentLM.cassetteQuickPhraseCommissionKey else {
       vCTestLog("Quick phrase commission key missing, skipping test")
       return
@@ -425,13 +449,11 @@ extension InputHandlerTests {
 
     typeSentence(quickPhraseKey)
 
-    // 打完 QuickPhrase 確認鍵之後，組筆區的內容應該會被清空、且此時應該有結果遞交出去。
-    let currentState = testSession.state
+    // 打完 QuickPhrase 確認鍵之後，組筆區的內容應該會被清空、且狀態必須回到 .ofEmpty。
     #expect(
-      currentState.type == .ofEmpty || currentState.type == .ofSymbolTable,
-      "Quick phrase with single result should either commit directly or open a symbol table, got \(currentState.type)."
+      testSession.state.type == .ofEmpty,
+      "Quick phrase with single result should commit directly, got \(testSession.state.type)."
     )
-    // ↑MockSession 會在遞交結果時回復為 .ofEmpty，因此此處允許 .ofEmpty。
     #expect(testHandler.calligrapher.isEmpty)
     // 只有單筆結果時，得立刻遞交出去。組筆區應該是有結果的。
     let result = generateDisplayedText()
@@ -488,8 +510,18 @@ extension InputHandlerTests {
     let stateCandidates = testSession.state.data.candidates.map { $0.value }
     #expect(stateCandidates == symbolCandidates)
     vCTestLog("Candidates: \(symbolCandidates)")
-    // Typewriter 測試不會去測試選字窗的行為，這類行為的測試由 MainAssembly 測試負責。
-    testSession.candidatePairSelectionConfirmed(at: 1)
+
+    // 安裝可見的模擬選字窗控制器，改以選字鍵（'2'）驅動符號表項目的選取。
+    testSession.installMockCandidateController()
+    defer { testSession.mockCandidateController = nil }
+    let selectionKeys = Array(testSession.selectionKeys)
+    #expect(selectionKeys.count > 1)
+    let selectionEvent = KBEvent.KeyEventData(chars: String(selectionKeys[1])).asEvent
+    #expect(testHandler.triageInput(event: selectionEvent))
+
+    // 選取之後，組筆區應被清空、狀態回到 .ofEmpty，且該符號表項目已遞交。
+    #expect(testHandler.calligrapher.isEmpty)
+    #expect(testSession.state.type == .ofEmpty)
     #expect(testSession.recentCommissions.last == "迷迷糊糊")
   }
 
@@ -741,6 +773,39 @@ extension InputHandlerTests {
     #expect(candidateValues.contains("譶"))
   }
 
+  /// 磁帶模式：對組筆區內容摁下 BackSpace 時，應只縮短組筆區、而不影響候選顯示。
+  @Test
+  func test_IH108A_CassetteBackspaceShrinksCalligrapher() throws {
+    guard let testHandler, let testSession else {
+      Issue.record("testHandler and testSession at least one of them is nil.")
+      return
+    }
+
+    let originalAsyncLoading = LMAssembly.LMInstantiator.asyncLoadingUserData
+    LMAssembly.LMInstantiator.asyncLoadingUserData = false
+    defer { LMAssembly.LMInstantiator.asyncLoadingUserData = originalAsyncLoading }
+
+    guard let cassetteURL = cassetteURLForTests("array30", ext: "cin2") else {
+      Issue.record("無法存取用以測試的資料。當前嘗試存取的檔案：array30.cin2")
+      return
+    }
+
+    LMAssembly.LMInstantiator.loadCassetteData(path: cassetteURL.path)
+
+    testHandler.clear()
+    testHandler.prefs.cassetteEnabled = true
+
+    typeSentence(",,,")
+    #expect(testHandler.calligrapher == ",,,")
+    #expect(testSession.state.isCandidateContainer)
+
+    #expect(testHandler.triageInput(event: KBEvent.KeyEventData.backspaceEvent.asEvent))
+
+    #expect(testHandler.calligrapher == ",,")
+    #expect(testSession.state.type == .ofInputting)
+    #expect(testSession.state.displayedText.count < 6)
+  }
+
   @Test
   func test_IH106_CodePointInputCheck() throws {
     guard let testHandler, let testSession else {
@@ -963,14 +1028,54 @@ extension InputHandlerTests {
     testSession.candidatePairHighlightChanged(at: 0)
     #expect(testSession.state.highlightedCandidateIndex == 0)
     #expect(testSession.state.displayedTextConverted == "　")
+    #expect(testSession.state.displayTextSegments == ["　"])
+    #expect(IMEStateParsed(testSession.state).attributedString.string == "　")
 
     testSession.candidatePairHighlightChanged(at: 1)
     #expect(testSession.state.highlightedCandidateIndex == 1)
     #expect(testSession.state.displayedTextConverted == "｀")
+    #expect(testSession.state.displayTextSegments == ["｀"])
+    #expect(IMEStateParsed(testSession.state).attributedString.string == "｀")
 
     testSession.candidatePairHighlightChanged(at: 2)
     #expect(testSession.state.highlightedCandidateIndex == 2)
     #expect(testSession.state.displayedTextConverted == "")
+    #expect(testSession.state.displayTextSegments == [])
+    #expect(
+      IMEStateParsed(testSession.state).attributedString.string ==
+        IMEStateParsed(testSession.state).attributedStringPlaceholder.string
+    )
+  }
+
+  /// 切換至符號表狀態時，應以該節點名稱作為組字區的顯示內容。
+  @Test
+  func test_IH111_SymbolTableInitSetsDisplaySegments() throws {
+    guard let testSession else {
+      Issue.record("testSession is nil.")
+      return
+    }
+    CandidateNode.load()
+    // 選一個沒有子元件的候選節點（葉節點 Candidate）。
+    let root = CandidateNode.root
+    var leafCandidate: CandidateNode?
+    func findLeaf(_ node: CandidateNode) {
+      if leafCandidate != nil { return }
+      if node.members.isEmpty {
+        leafCandidate = node
+        return
+      }
+      for member in node.members { findLeaf(member) }
+    }
+    findLeaf(root)
+    guard let leaf = leafCandidate else {
+      Issue.record("No leaf candidate found.")
+      return
+    }
+    testSession.switchState(.ofSymbolTable(node: leaf))
+    #expect(testSession.state.type == .ofSymbolTable)
+    #expect(!(testSession.state.node.name.isEmpty))
+    #expect(testSession.state.data.displayTextSegments == [testSession.state.node.name])
+    #expect(testSession.state.data.displayedText == testSession.state.node.name)
   }
 
   @Test
