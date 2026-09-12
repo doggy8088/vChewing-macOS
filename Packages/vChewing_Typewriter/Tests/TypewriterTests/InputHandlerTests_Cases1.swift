@@ -3896,7 +3896,11 @@ extension InputHandlerTests {
     testHandler.prefs.furiousTypingEnabled = true
     testHandler.currentLM.syncPrefs()
 
-    let ts: Double = 1_788_459_361
+    // 記憶時戳一律以「現在」為基準。LXPerceptor.calculateWeight 對年齡達 wT（預設 8 天）
+    // 的記憶直接淘汰（`daysDiff >= wT` → threshold - 0.001），故任何寫死的絕對時戳都會讓
+    // 本測試在該時戳之後第 8 天起必然轉紅——P183 原版即寫死 `1_788_459_361`（2026-09-04），
+    // 於 2026-09-12 屆期失效。
+    let ts: Double = Date().timeIntervalSince1970 - 60
     testHandler.currentLM.memorizePerception(
       (ngramKey: "(ㄉㄧㄢˋ,電)&(ㄋㄠˇ,腦)&(ㄅㄢˇ,版)", candidate: "版"), timestamp: ts
     )
