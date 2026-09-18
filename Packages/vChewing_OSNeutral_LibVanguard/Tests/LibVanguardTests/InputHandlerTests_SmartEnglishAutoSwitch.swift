@@ -642,6 +642,42 @@ extension LibVanguardTestsRoot.InputHandlerTests {
   }
 
   @Test
+  func test_SES043_FullWidthColonIsNotDuplicatedInEnglishOutput() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 中文模式下 `:` 會被轉成全形 `：` 併入組字器；轉英時必須只輸出半形的原按鍵序列。
+    let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
+    defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
+    testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
+    _ = triageKey(":")
+    _ = triageKey("/")
+    #expect(testHandler.committableDisplayText(sansReading: true).contains("："))
+    _ = triageKey("/")
+    #expect(triageKey("/"))
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == ":///")
+  }
+
+  @Test
+  func test_SES044_ChinesePrefixSanitizerDropsOnlyTrailOwnedPunctuation() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 出自同一批按鍵的全形標點：由序列承擔輸出 → 自前綴移除。
+    #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: [":", "/"]) == "")
+    #expect(
+      testHandler.sanitizedChinesePrefixForSmartEnglish("話，", trail: ["<", "u", "/"]) == "話，"
+    )
+    // 序列中沒有對應的半形字元時，一律保留（例如先前正常輸入的中文標點）。
+    #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: ["c", "d"]) == "：")
+  }
+
+  @Test
   func test_SES042_RepeatedPunctuationQuickPhraseDoesNotSwitch() throws {
     resetSmartEnglishTestState()
     guard let testHandler else {

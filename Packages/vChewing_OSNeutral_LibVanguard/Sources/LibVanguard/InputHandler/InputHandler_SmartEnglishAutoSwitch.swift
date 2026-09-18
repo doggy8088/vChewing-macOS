@@ -223,7 +223,11 @@ extension InputHandlerProtocol {
   /// - Parameter appendingSpace: 是否在遞交的英文內容之後附加一個半形空格。
   func triggerSmartEnglishMode(appendingSpace: Bool) {
     guard let session else { return }
-    let chineseText = committableDisplayText(sansReading: true)
+    let rawChineseText = committableDisplayText(sansReading: true)
+    let chineseText = sanitizedChinesePrefixForSmartEnglish(
+      rawChineseText,
+      trail: smartEnglishContext.keyTrail
+    )
     let englishText = smartEnglishContext.keyTrail.joined()
     let snapshot = SmartEnglishModeState.ChineseCompositionSnapshot(
       composer: composer,
@@ -259,6 +263,24 @@ extension InputHandlerProtocol {
     smartEnglishContext.lastKnownComposerWasNonEmpty = !composer.isEmpty
     guard !isComposerOrCalligrapherEmpty else { return }
     session.switchState(generateStateOfInputting(guarded: true))
+  }
+
+  /// 觸發轉英時，自中文前綴尾端移除「其實出自同一批按鍵」的全形標點。
+  ///
+  /// 例：`:` 在中文模式下會被轉成全形 `：` 併入組字器，但半形的 `:` 仍在輸入鍵序列中；
+  /// 轉英時應由序列承擔輸出（半形），故自前綴尾端移除該全形標點，避免重複輸出與全形殘留。
+  /// 註：僅在「該全形字元的半形對應字元確實存在於序列中」時才移除，故不影響正常輸入的中文標點。
+  func sanitizedChinesePrefixForSmartEnglish(_ prefix: String, trail: [String]) -> String {
+    let trailJoined = trail.joined()
+    guard !trailJoined.isEmpty else { return prefix }
+    var result = prefix
+    while let lastCharacter = result.last {
+      let lastString = String(lastCharacter)
+      let halfWidthForm = lastString.applyingTransformFW2HW(reverse: false)
+      guard halfWidthForm != lastString, trailJoined.contains(halfWidthForm) else { break }
+      result.removeLast()
+    }
+    return result
   }
 
   /// 對帳：注拼槽內容若已在別處被固化／清空，輸入鍵序列即失效、連續誤鍵計次一併歸零
