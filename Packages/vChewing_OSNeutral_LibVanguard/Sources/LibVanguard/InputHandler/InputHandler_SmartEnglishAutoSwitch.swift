@@ -59,12 +59,13 @@ extension InputHandlerProtocol {
 
   // MARK: - 狀態重設
 
-  /// 清空輸入鍵序列（組字內容被遞交時呼叫）並歸零連續誤鍵計次。
+  /// 清空輸入鍵序列（組字內容被遞交時呼叫）並歸零連續誤鍵計次與標點歸屬。
   public func resetSmartEnglishKeyTrail() {
     smartEnglishContext.keyTrail.removeAll()
     smartEnglishContext.lastKnownComposerWasNonEmpty = false
     smartEnglishContext.consecutiveTypingErrorCount = 0
     smartEnglishContext.analyzedViolationCount = 0
+    smartEnglishContext.trailOwnedPunctuation = nil
   }
 
   /// 重設智慧中英自動切換的所有暫態（含進行中的英數暫存模式）。
@@ -240,6 +241,7 @@ extension InputHandlerProtocol {
     smartEnglishContext.lastKnownComposerWasNonEmpty = false
     smartEnglishContext.consecutiveTypingErrorCount = 0
     smartEnglishContext.analyzedViolationCount = 0
+    smartEnglishContext.trailOwnedPunctuation = nil
     smartEnglishContext.mode = .init(
       lastActivityDate: .init(),
       consecutiveBackSpaceCount: 0,
@@ -267,26 +269,49 @@ extension InputHandlerProtocol {
 
   /// 觸發轉英時，自中文前綴尾端移除「其實出自同一批按鍵」的全形標點。
   ///
-  /// 例：`:` 在中文模式下會被轉成全形 `：` 併入組字器，但半形的 `:` 仍在輸入鍵序列中；
-  /// 轉英時應由序列承擔輸出（半形），故自前綴尾端移除該全形標點，避免重複輸出與全形殘留。
-  /// 註：僅在「該全形字元的半形對應字元確實存在於序列中」時才移除，故不影響正常輸入的中文標點。
+  /// 兩道判定：
+  /// 1. 該全形字元的半形對應字元仍在輸入鍵序列中 → 自前綴移除（序列會負責輸出半形，避免重複）。
+  /// 2. 該全形字元即 `trailOwnedPunctuation`（先前由序列中的按鍵產生、但序列已在對帳時失去
+  ///    該鍵，例如實機上的 `:`）→ 改以半形保留（不重複、也不殘留全形）。
+  ///
+  /// 註：僅在「該全形字元的半形對應字元存在於序列中」、或「該字元確實是序列自身產生」時才處理，
+  /// 故不影響先前正常輸入的中文標點。
   func sanitizedChinesePrefixForSmartEnglish(_ prefix: String, trail: [String]) -> String {
     let trailJoined = trail.joined()
-    guard !trailJoined.isEmpty else { return prefix }
     var result = prefix
+    // 判定 1：序列自身已承擔輸出者，自前綴剔除。
     while let lastCharacter = result.last {
       let lastString = String(lastCharacter)
-      let halfWidthForm = lastString.applyingTransformFW2HW(reverse: false)
-      guard halfWidthForm != lastString, trailJoined.contains(halfWidthForm) else { break }
+      guard let halfWidthForm = lastString.halfWidthFormIfConvertible,
+            trailJoined.contains(halfWidthForm) else { break }
       result.removeLast()
     }
+    // 判定 2：序列已失去該鍵、但該標點確為序列所產生者，改以半形保留。
+    if let owned = smartEnglishContext.trailOwnedPunctuation,
+       let halfWidthOwned = owned.halfWidthFormIfConvertible,
+       !trailJoined.contains(halfWidthOwned),
+       result.hasSuffix(owned) {
+      result.removeLast(owned.count)
+      result += halfWidthOwned
+    }
     return result
+  }
+
+  /// 記錄「剛被併入組字器的全形標點其實出自輸入鍵序列」。
+  /// - Parameter displayedPunctuation: 該標點在組字區的顯示字元（例如全形 `：`）。
+  func noteSmartEnglishTrailOwnedPunctuation(displayedPunctuation: String?) {
+    guard isSmartEnglishAutoSwitchApplicable else { return }
+    guard !smartEnglishContext.keyTrail.isEmpty else { return }
+    guard let displayedPunctuation, !displayedPunctuation.isEmpty else { return }
+    smartEnglishContext.trailOwnedPunctuation = displayedPunctuation
+    vCLog("SmartEnglish: trail-owned punctuation \(displayedPunctuation.debugDescription).")
   }
 
   /// 對帳：注拼槽內容若已在別處被固化／清空，輸入鍵序列即失效、連續誤鍵計次一併歸零
   /// （組字內容成功成文＝確為中文打字）。
   func reconcileSmartEnglishKeyTrail() {
     if composer.isEmpty, smartEnglishContext.lastKnownComposerWasNonEmpty {
+      vCLog("SmartEnglish: trail invalidated (composer flushed elsewhere); trail=\(smartEnglishContext.keyTrail.joined())")
       smartEnglishContext.keyTrail.removeAll()
       smartEnglishContext.consecutiveTypingErrorCount = 0
       smartEnglishContext.analyzedViolationCount = 0
@@ -307,5 +332,16 @@ extension InputHandlerProtocol {
     guard !input.isHoldingAny([.command, .control, .option]) else { return }
     guard input.charCode.isPrintableASCII, !input.text.isEmpty else { return }
     smartEnglishContext.keyTrail.append(input.text)
+  }
+}
+
+// MARK: - 內部輔助
+
+private extension String {
+  /// 該字串的半形對應形式；若該字串本身即無全形變化（例如漢字），則回傳 `nil`。
+  var halfWidthFormIfConvertible: String? {
+    let halfWidth = applyingTransformFW2HW(reverse: false)
+    guard halfWidth != self, !halfWidth.isEmpty else { return nil }
+    return halfWidth
   }
 }
