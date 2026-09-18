@@ -632,6 +632,9 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       return
     }
     // `https://` 一氣呵成：預設門檻 5，於最後一個 `/` 達標並整段轉英。
+    // 註：此情境的 `:` 因注拼槽非空而未併入組字器（維持既有蜂鳴語義），故其半形字元
+    // 由輸入鍵序列承擔；若 `:` 確已併入組字器，則由 `trailOwnedPunctuations` 改寫為半形
+    // （見 SES045），兩條路徑的輸出同為半形的 `https://`。
     #expect(testHandler.smartEnglishErrorThreshold == 5)
     ["h", "t", "t", "p", "s", ":", "/"].forEach { _ = triageKey($0) }
     #expect(testHandler.smartEnglishConsecutiveTypingErrors == 4)
@@ -649,16 +652,13 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       return
     }
     // 中文模式下 `:` 會被轉成全形 `：` 併入組字器；轉英時必須只輸出半形的原按鍵序列。
-    let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
-    defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
-    testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
     _ = triageKey(":")
     _ = triageKey("/")
     #expect(testHandler.committableDisplayText(sansReading: true).contains("："))
     _ = triageKey("/")
-    #expect(triageKey("/"))
+    #expect(triageKey(" "))
     #expect(testHandler.isSmartEnglishModeActive)
-    #expect(testSession.recentCommissions.last == ":///")
+    #expect(testSession.recentCommissions.last == ":// ")
   }
 
   @Test
@@ -690,28 +690,71 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     #expect(testHandler.smartEnglishConsecutiveTypingErrors < testHandler.smartEnglishErrorThreshold)
   }
 
-  // MARK: - URL 情境（全形標點於序列對帳後遺失該鍵）
+  // MARK: - 標點情境（標點是正常輸入，永不計為誤鍵）
 
   @Test
-  func test_SES045_TrailOwnedPunctuationConvertsToHalfWidthWhenTrailLostTheKey() throws {
+  func test_SES048_PunctuationViaAliasKeyIsNotATypingError() throws {
     resetSmartEnglishTestState()
     guard let testHandler, let testSession else {
       Issue.record("Test handler or session is nil.")
       return
     }
-    // 實機（Ghostty）觀察到的偶發狀態：`:` 曾在輸入鍵序列對帳時遺失，
-    // 但組字器仍保有全形 `：`，導致轉英輸出成「：//ww」。
-    // 此處直接重現該狀態，驗證半形輸出保證不因序列內容變動而失效。
+    // 實機案例：以 `<` 鍵輸入「，」（該鍵不是注音鍵），原本被計為無效鍵，
+    // 導致接著打「終於」（終 ＝ ㄓㄨㄥ）再按空白鍵（一聲）即誤轉英文。
+    let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
+    defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
+    testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
+    _ = triageKey("<")
+    #expect(testHandler.committableDisplayText(sansReading: true).contains("，"))
+    // 標點按鍵既已由組字器承擔輸出，就不該留在輸入鍵序列中、也不該計為誤鍵。
+    #expect(testHandler.smartEnglishKeyTrail.isEmpty, "trail=\(testHandler.smartEnglishKeyTrail)")
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 0)
+    ["5", "j", "/"].forEach { _ = triageKey($0) }
+    _ = triageKey(" ")
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(
+      !testSession.recentCommissions.contains { $0.contains("<") },
+      "commissions=\(testSession.recentCommissions)"
+    )
+  }
+
+  @Test
+  func test_SES049_TrailRecordsNoPunctuationKeysAtAll() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 全形標點與其別名鍵（`<`、`[`、`'`……）皆屬正常輸入，逐一驗證不計誤鍵。
+    for key in ["<", ">", "[", "]", "'", "\\"] {
+      resetSmartEnglishTestState()
+      _ = triageKey(key)
+      #expect(testHandler.smartEnglishKeyTrail.isEmpty, "key=\(key) trail=\(testHandler.smartEnglishKeyTrail)")
+      #expect(
+        testHandler.smartEnglishConsecutiveTypingErrors == 0,
+        "key=\(key) errors=\(testHandler.smartEnglishConsecutiveTypingErrors)"
+      )
+      #expect(!testHandler.isSmartEnglishModeActive, "key=\(key)")
+    }
+  }
+
+  // MARK: - URL 情境（半形輸出保證）
+
+  @Test
+  func test_SES045_ColonIsNotResurrectedAfterPunctuationKeyRemoval() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 實機（Ghostty）案例：`:` 已併入組字器為全形 `：`、且已自輸入鍵序列移除，
+    // 轉英時仍必須輸出半形的 `://ww`（不得殘留全形、也不得漏掉該冒號）。
     let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
     defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
     testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
     _ = triageKey(":")
     #expect(testHandler.committableDisplayText(sansReading: true).contains("："))
-    #expect(
-      testHandler.smartEnglishContext.trailOwnedPunctuation == "：",
-      "owned=\(String(describing: testHandler.smartEnglishContext.trailOwnedPunctuation))"
-    )
-    testHandler.smartEnglishContext.keyTrail.removeAll { $0 == ":" }
+    #expect(testHandler.smartEnglishContext.trailOwnedPunctuations == ["："])
     ["/", "/", "w", "w"].forEach { _ = triageKey($0) }
     #expect(testHandler.isSmartEnglishModeActive)
     // 觸發時遞交的內容與後續英數暫存模式的逐字遞交，接起來必須是半形的 `://ww`。
@@ -728,8 +771,8 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       return
     }
     // 實機（Ghostty）案例：`https` 觸發轉英後閒置逾時（> 500 ms），接著敲下的 `:` 會結束
-    // 英數暫存模式；該按鍵必須以「中文模式的新按鍵」續審（記入輸入鍵序列），
-    // 否則併入組字器的全形 `：` 不會被視為同一批按鍵、轉英時便會殘留全形。
+    // 英數暫存模式；該按鍵必須以「中文模式的新按鍵」續審，否則併入組字器的全形 `：`
+    // 不會被視為同一批按鍵、轉英時便會殘留全形。
     let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
     defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
     testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
@@ -739,7 +782,6 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     testHandler.smartEnglishContext.mode?.lastActivityDate = Date(timeIntervalSinceNow: -10)
     _ = triageKey(":")
     #expect(!testHandler.isSmartEnglishModeActive)
-    #expect(testHandler.smartEnglishKeyTrail == [":"])
     #expect(testHandler.committableDisplayText(sansReading: true).contains("："))
     ["/", "/", "w", "w"].forEach { _ = triageKey($0) }
     let commissions = testSession.recentCommissions.joined()
@@ -754,13 +796,17 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       Issue.record("Test handler or session is nil.")
       return
     }
-    // 序列仍保有半形 `:`：走「剔除」，由序列承擔輸出。
-    testHandler.smartEnglishContext.trailOwnedPunctuation = "："
-    #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: [":", "/"]) == "")
-    // 序列已失去該鍵、但該標點確為序列所產生：改寫為半形，不重複、也不殘留全形。
+    // 序列已失去該鍵（已由組字器承擔）、且該標點確為序列所產生：改寫為半形，不重複、也不殘留全形。
+    testHandler.smartEnglishContext.trailOwnedPunctuations = ["："]
     #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: ["/", "/"]) == ":")
+    // 序列自產標點的連續串（例如「（，」）依序改寫為半形。
+    testHandler.smartEnglishContext.trailOwnedPunctuations = ["（", "，"]
+    #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("（，", trail: ["w"]) == "(,")
+    // 序列同時保有半形字元時，該自產標點整段剔除（避免重複輸出）。
+    testHandler.smartEnglishContext.trailOwnedPunctuations = ["："]
+    #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: [":", "/"]) == "")
     // 非序列所產生的中文標點（例如使用者自行輸入的 `，`）一律保留原樣。
-    testHandler.smartEnglishContext.trailOwnedPunctuation = nil
+    testHandler.smartEnglishContext.trailOwnedPunctuations = []
     #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("話，", trail: ["w", "w"]) == "話，")
     #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: ["c", "d"]) == "：")
   }
