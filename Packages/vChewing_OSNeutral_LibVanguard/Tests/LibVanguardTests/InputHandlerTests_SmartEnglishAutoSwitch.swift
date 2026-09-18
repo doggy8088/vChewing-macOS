@@ -369,4 +369,120 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     #expect(testHandler.isSmartEnglishModeActive)
     #expect(testSession.recentCommissions.contains("cl"))
   }
+
+  @Test
+  func test_SES020_RelativePathWithTabIsConverted() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 相對路徑情境：`./con` ＋ Tab（`.` 與 `/` 亦必須計入輸入鍵序列）。
+    ["."].forEach { _ = triageKey($0) }
+    _ = triageKey("/")
+    ["c", "o", "n"].forEach { _ = triageKey($0) }
+    #expect(testHandler.smartEnglishKeyTrail == [".", "/", "c", "o", "n"])
+    let consumed = triageKey(
+      KBEvent.SpecialKey.tab.unicodeScalar.description,
+      keyCode: KeyCode.kTab.rawValue
+    )
+    #expect(!consumed)
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.contains("./con"))
+  }
+
+  @Test
+  func test_SES021_FileNamePrefixWithTabIsConverted() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 檔名前綴情境：`conf` ＋ Tab。
+    ["c", "o", "n", "f"].forEach { _ = triageKey($0) }
+    #expect(testHandler.smartEnglishKeyTrail == ["c", "o", "n", "f"])
+    let consumed = triageKey(
+      KBEvent.SpecialKey.tab.unicodeScalar.description,
+      keyCode: KeyCode.kTab.rawValue
+    )
+    #expect(!consumed)
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.contains("conf"))
+  }
+
+  @Test
+  func test_SES022_ParentRelativePathWithTabIsConverted() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 上一層相對路徑情境：`../pro` ＋ Tab。
+    ["."].forEach { _ = triageKey($0) }
+    _ = triageKey(".")
+    _ = triageKey("/")
+    ["p", "r", "o"].forEach { _ = triageKey($0) }
+    let consumed = triageKey(
+      KBEvent.SpecialKey.tab.unicodeScalar.description,
+      keyCode: KeyCode.kTab.rawValue
+    )
+    #expect(!consumed)
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.contains("../pro"))
+  }
+
+  @Test
+  func test_SES023_TabInsideEnglishModeStaysInEnglish() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 英數暫存模式中的 Tab（例如 `cd ` 之後的自動完成）純放行、不遞交任何內容、亦不結束模式。
+    typeSentence("cd ")
+    #expect(testHandler.isSmartEnglishModeActive)
+    let countBefore = testSession.recentCommissions.count
+    let consumed = triageKey(
+      KBEvent.SpecialKey.tab.unicodeScalar.description,
+      keyCode: KeyCode.kTab.rawValue
+    )
+    #expect(!consumed)
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.count == countBefore)
+  }
+
+  @Test
+  func test_SES024_RelativePathFollowedBySpaceIsConverted() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 路徑後接空格（`./con `）亦屬不合理的注音順序，比照 `cd ` 轉為英文。
+    _ = triageKey(".")
+    _ = triageKey("/")
+    ["c", "o", "n"].forEach { _ = triageKey($0) }
+    #expect(triageKey(" "))
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == "./con ")
+  }
+
+  @Test
+  func test_SES025_UpperCasePathSegmentWithTab() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 含大寫字母的路徑片段（`./Doc`）＋ Tab。
+    _ = triageKey(".")
+    _ = triageKey("/")
+    _ = triageKey("D", flags: [.shift])
+    ["o", "c"].forEach { _ = triageKey($0) }
+    _ = triageKey(
+      KBEvent.SpecialKey.tab.unicodeScalar.description,
+      keyCode: KeyCode.kTab.rawValue
+    )
+    #expect(testSession.recentCommissions.joined() == "./Doc")
+  }
 }
