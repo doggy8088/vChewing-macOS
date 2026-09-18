@@ -35,6 +35,9 @@ public struct SmartEnglishTypingContext {
   public var consecutiveTypingErrorCount: Int = 0
   /// 上次分析當前序列所得的違規總數（用來計算逐鍵增量）。
   public var analyzedViolationCount: Int = 0
+  /// 最近一次「由輸入鍵序列中的按鍵所產生、且已併入組字器」的全形標點。
+  /// 用以在序列因對帳而失去該鍵時，仍能判定該標點其實出自同一批按鍵。
+  public var trailOwnedPunctuation: String?
   /// 英數暫存模式的執行期狀態；`nil` 表示目前不在該模式內。
   public var mode: SmartEnglishModeState?
 }

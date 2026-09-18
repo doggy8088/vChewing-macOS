@@ -831,6 +831,12 @@ extension InputHandlerProtocol {
     inputting.textToCommit = textToCommit
     session.switchState(inputting)
 
+    // 智慧中英自動切換：這個全形標點是在輸入鍵序列非空時敲進來的（例如 `https://` 的 `:`），
+    // 記下此事，供轉英時判定「該標點出自同一批按鍵、應改以半形輸出」。
+    noteSmartEnglishTrailOwnedPunctuation(
+      displayedPunctuation: committableDisplayText(sansReading: true).last.map(String.init)
+    )
+
     // 從這一行之後開始，就是針對逐字選字模式的單獨處理。
     guard prefs.useSCPCTypingMode, isComposerOrCalligrapherEmpty else { return true }
 
