@@ -721,6 +721,33 @@ extension LibVanguardTestsRoot.InputHandlerTests {
   }
 
   @Test
+  func test_SES047_IdleExitKeyIsRecordedAsFreshChineseInput() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 實機（Ghostty）案例：`https` 觸發轉英後閒置逾時（> 500 ms），接著敲下的 `:` 會結束
+    // 英數暫存模式；該按鍵必須以「中文模式的新按鍵」續審（記入輸入鍵序列），
+    // 否則併入組字器的全形 `：` 不會被視為同一批按鍵、轉英時便會殘留全形。
+    let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
+    defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
+    testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
+    ["h", "t", "t", "p", "s"].forEach { _ = triageKey($0) }
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == "https")
+    testHandler.smartEnglishContext.mode?.lastActivityDate = Date(timeIntervalSinceNow: -10)
+    _ = triageKey(":")
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(testHandler.smartEnglishKeyTrail == [":"])
+    #expect(testHandler.committableDisplayText(sansReading: true).contains("："))
+    ["/", "/", "w", "w"].forEach { _ = triageKey($0) }
+    let commissions = testSession.recentCommissions.joined()
+    #expect(commissions.contains("://ww"), "commissions=\(testSession.recentCommissions)")
+    #expect(!commissions.contains("："), "commissions=\(testSession.recentCommissions)")
+  }
+
+  @Test
   func test_SES046_ChinesePrefixSanitizerConvertsOnlyTrailOwnedPunctuation() throws {
     resetSmartEnglishTestState()
     guard let testHandler else {
