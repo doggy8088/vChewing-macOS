@@ -38,6 +38,11 @@
         }
 
         Section {
+          UserDef.kSmartEnglishAutoSwitchEnabled.renderUI()
+          UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.renderUI()
+        }
+
+        Section {
           UserDef.kSpaceKeyBehaviorAgainstICB.renderUI()
           UserDef.kPreferredRevolverForceLevel.renderUI()
           UserDef.kEscToCleanInputBuffer.renderUI()
