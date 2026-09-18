@@ -449,6 +449,8 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     #expect(!consumed)
     #expect(testHandler.isSmartEnglishModeActive)
     #expect(testSession.recentCommissions.count == countBefore)
+    // Tab 鍵不得被當成 Tab 字元遞交。
+    #expect(!testSession.recentCommissions.joined().contains("\t"))
   }
 
   @Test
@@ -484,5 +486,36 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       keyCode: KeyCode.kTab.rawValue
     )
     #expect(testSession.recentCommissions.joined() == "./Doc")
+  }
+
+  @Test
+  func test_SES026_TabIsPassedThroughAsAKeyNotAsACharacter() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    let tab = KBEvent.SpecialKey.tab.unicodeScalar.description
+    let tabKeyCode = KeyCode.kTab.rawValue
+
+    // `<Tab>` 的語義：把「真實的 Tab 按鍵」放行給客體（終端機因而觸發自動完成），
+    // 而不是把 Tab 字元（`\t`）當成文字遞交。
+    ["g", "i", "t"].forEach { _ = triageKey($0) }
+    #expect(!triageKey(tab, keyCode: tabKeyCode))
+    #expect(testSession.recentCommissions == ["git"])
+    #expect(!testSession.recentCommissions.joined().contains("\t"))
+
+    // 英數暫存模式內再按 Tab：同樣只放行、不遞交。
+    #expect(!triageKey(tab, keyCode: tabKeyCode))
+    #expect(testSession.recentCommissions == ["git"])
+    #expect(!testHandler.smartEnglishContext.keyTrail.contains(where: { $0 == "\t" }))
+
+    // Shift+Tab（反向自動完成）：比照辦理。
+    testHandler.resetSmartEnglishAutoSwitchState()
+    testSession.recentCommissions.removeAll()
+    ["p", "r", "o"].forEach { _ = triageKey($0) }
+    #expect(!triageKey(tab, keyCode: tabKeyCode, flags: [.shift]))
+    #expect(testSession.recentCommissions == ["pro"])
+    #expect(!testSession.recentCommissions.joined().contains("\t"))
   }
 }
