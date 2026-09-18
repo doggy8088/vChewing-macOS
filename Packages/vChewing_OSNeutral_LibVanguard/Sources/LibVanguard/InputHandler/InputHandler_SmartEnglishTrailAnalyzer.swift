@@ -109,12 +109,18 @@ enum SmartEnglishTrailAnalyzer {
       }
       result.containsZhuyinKey = true
       if !probe.intonation.isEmpty {
+        // 聲調鍵＝音節收束；重複的聲調（例如連按兩次 `3`）屬既有的聲調覆寫語義，不計為誤鍵。
         flushSyllable()
       } else if !probe.vowel.isEmpty {
+        if vowel == probe.vowel.value {
+          // 同一韻母鍵連按＝槽位內容不變的死鍵（例如 URL 的 `//` ＝ ㄥㄥ），計為誤鍵。
+          result.violationCount += 1
+        }
         vowel = probe.vowel.value
         highestFilledSlot = max(highestFilledSlot, 3)
       } else if !probe.semivowel.isEmpty {
         if highestFilledSlot > 2 { result.violationCount += 1 }
+        if semivowel == probe.semivowel.value { result.violationCount += 1 }
         semivowel = probe.semivowel.value
         highestFilledSlot = max(highestFilledSlot, 2)
       } else {
