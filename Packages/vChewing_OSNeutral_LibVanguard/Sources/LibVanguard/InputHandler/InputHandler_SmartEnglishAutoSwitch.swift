@@ -83,11 +83,24 @@ extension InputHandlerProtocol {
   public func handleSmartEnglishAutoSwitch(input: some InputSignalProtocol) -> Bool? {
     guard isSmartEnglishAutoSwitchApplicable else { return nil }
 
-    // 英數暫存模式中：由模式專屬分診接管。
+    // 英數暫存模式中：由模式專屬分診接管。該分診若回傳 `nil`（含因閒置逾時而結束模式），
+    // 本拍按鍵即等同中文模式下的新按鍵——必須照常記入輸入鍵序列，否則該鍵不會被視為
+    // 「同一批按鍵」（實機案例：`https` → 閒置逾時 → `:` 併成全形 `：` 卻無紀錄）。
     if smartEnglishContext.mode != nil {
-      return handleSmartEnglishModeInput(input: input)
+      guard let modeResult = handleSmartEnglishModeInput(input: input) else {
+        return handleSmartEnglishChineseModeInput(input: input)
+      }
+      return modeResult
     }
 
+    return handleSmartEnglishChineseModeInput(input: input)
+  }
+
+  /// 中文模式下的鍵入分診（含各種自動轉英觸發判定）。
+  /// - Parameter input: 輸入按鍵訊號。
+  /// - Returns: `nil`：不攔截、續走既有分診；`true`：本拍按鍵已被本功能消費；
+  ///   `false`：本拍按鍵放行給客體應用、不再分診。
+  func handleSmartEnglishChineseModeInput(input: some InputSignalProtocol) -> Bool? {
     // 對帳：注拼槽若已在別處被固化／清空，序列即失效。
     reconcileSmartEnglishKeyTrail()
 
