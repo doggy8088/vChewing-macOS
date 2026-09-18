@@ -602,4 +602,55 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     #expect(!testHandler.isSmartEnglishModeActive)
     #expect(!testSession.recentCommissions.contains { $0.contains("cd") })
   }
+
+  // MARK: - URL 情境（重複韻母鍵視為誤鍵）
+
+  @Test
+  func test_SES040_RepeatedSlashCountsAsTypingError() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // `/` ＝ ㄥ：連按兩次即槽位內容不變的死鍵，應計為誤鍵。
+    let single = SmartEnglishTrailAnalyzer.analyze(keyTrail: [":", "/"], parser: .ofDachen)
+    let doubled = SmartEnglishTrailAnalyzer.analyze(keyTrail: [":", "/", "/"], parser: .ofDachen)
+    #expect(doubled.violationCount == single.violationCount + 1)
+    // 實機（handler）流程亦同：連按第二個 `/` 使計次增加一次。
+    _ = triageKey(":")
+    _ = triageKey("/")
+    let errorsBeforeRepeat = testHandler.smartEnglishConsecutiveTypingErrors
+    _ = triageKey("/")
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == errorsBeforeRepeat + 1)
+  }
+
+  @Test
+  func test_SES041_HTTPSURLWithDefaultThresholdConvertsEnglish() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // `https://` 一氣呵成：預設門檻 5，於最後一個 `/` 達標並整段轉英。
+    #expect(testHandler.smartEnglishErrorThreshold == 5)
+    ["h", "t", "t", "p", "s", ":", "/"].forEach { _ = triageKey($0) }
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 4)
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(triageKey("/"))
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == "https://")
+  }
+
+  @Test
+  func test_SES042_RepeatedPunctuationQuickPhraseDoesNotSwitch() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 快速標點（`,,,,`）不得因重複鍵新規則而誤觸自動轉英。
+    typeSentence(",,,,")
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors < testHandler.smartEnglishErrorThreshold)
+  }
 }
