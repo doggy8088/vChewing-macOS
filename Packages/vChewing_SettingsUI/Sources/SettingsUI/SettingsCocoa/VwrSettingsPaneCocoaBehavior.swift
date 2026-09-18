@@ -89,6 +89,10 @@ extension SettingsPanesCocoa {
             fixWidth: contentWidth,
             prefUITab: .tabBehavior
           )
+          UserDef.kSmartEnglishAutoSwitchErrorThreshold.renderCocoa(
+            fixWidth: contentWidth,
+            prefUITab: .tabBehavior
+          )
         }?.boxed()
         NSStackView.buildSection(width: contentWidth) {
           UserDef.kSpaceKeyBehaviorAgainstICB.renderCocoa(

@@ -31,6 +31,14 @@ extension InputHandlerProtocol {
   /// 當前輸入鍵序列。
   public var smartEnglishKeyTrail: [String] { smartEnglishContext.keyTrail }
 
+  /// 連續誤鍵次數。
+  public var smartEnglishConsecutiveTypingErrors: Int { smartEnglishContext.consecutiveTypingErrorCount }
+
+  /// 觸發自動轉英所需的連續誤鍵次數（偏好設定值夾限於 3...8）。
+  public var smartEnglishErrorThreshold: Int {
+    Swift.min(8, Swift.max(3, prefs.smartEnglishAutoSwitchErrorThreshold))
+  }
+
   /// 閒置逾時秒數（由偏好設定之毫秒值換算；下限 50 ms 以防設定值失效）。
   public var smartEnglishIdleTimeoutSeconds: Double {
     Swift.max(0.05, Double(prefs.smartEnglishAutoSwitchIdleTimeoutMS) / 1000)
@@ -51,10 +59,12 @@ extension InputHandlerProtocol {
 
   // MARK: - 狀態重設
 
-  /// 清空輸入鍵序列（組字內容被遞交時呼叫）。
+  /// 清空輸入鍵序列（組字內容被遞交時呼叫）並歸零連續誤鍵計次。
   public func resetSmartEnglishKeyTrail() {
     smartEnglishContext.keyTrail.removeAll()
     smartEnglishContext.lastKnownComposerWasNonEmpty = false
+    smartEnglishContext.consecutiveTypingErrorCount = 0
+    smartEnglishContext.analyzedViolationCount = 0
   }
 
   /// 重設智慧中英自動切換的所有暫態（含進行中的英數暫存模式）。
@@ -100,8 +110,37 @@ extension InputHandlerProtocol {
       }
     }
 
+    // BackSpace：尚未輸出英文前的退格＝使用者想打中文、只是打錯鍵，連續誤鍵計次歸零
+    // （序列本身的既有違規量維持對帳基準，避免退格後重複計入先前的違規）。
+    if input.isBackSpace {
+      smartEnglishContext.consecutiveTypingErrorCount = 0
+      recordSmartEnglishKeyTrailKey(input: input)
+      smartEnglishContext.analyzedViolationCount = analyzeSmartEnglishKeyTrail().violationCount
+      return nil
+    }
+
     recordSmartEnglishKeyTrailKey(input: input)
+
+    // 連續誤鍵達門檻時自動轉英（適用於「所有輸入鍵都是合理按鍵、但輸入順序不合理」的情形）。
+    if accountSmartEnglishTypingErrors() { return true }
+
     return nil
+  }
+
+  /// 逐鍵累計「連續誤鍵」次數；達門檻時直接轉為英文輸出。
+  /// - Returns: 是否已因而進入英數暫存模式（是的話呼叫端應消費本拍按鍵）。
+  func accountSmartEnglishTypingErrors() -> Bool {
+    let analysis = analyzeSmartEnglishKeyTrail()
+    let delta = analysis.violationCount - smartEnglishContext.analyzedViolationCount
+    if delta > 0 { smartEnglishContext.consecutiveTypingErrorCount += delta }
+    smartEnglishContext.analyzedViolationCount = analysis.violationCount
+    let threshold = smartEnglishErrorThreshold
+    guard smartEnglishContext.consecutiveTypingErrorCount >= threshold,
+          !smartEnglishContext.keyTrail.isEmpty else { return false }
+    let trailJoined = smartEnglishContext.keyTrail.joined()
+    vCLog("SmartEnglish: consecutive typing errors reached \(threshold); trail=\(trailJoined)")
+    triggerSmartEnglishMode(appendingSpace: false)
+    return true
   }
 
   /// 分析當前輸入鍵序列是否為合理的中文輸入順序。
@@ -195,6 +234,8 @@ extension InputHandlerProtocol {
     assembler.clear()
     smartEnglishContext.keyTrail.removeAll()
     smartEnglishContext.lastKnownComposerWasNonEmpty = false
+    smartEnglishContext.consecutiveTypingErrorCount = 0
+    smartEnglishContext.analyzedViolationCount = 0
     smartEnglishContext.mode = .init(
       lastActivityDate: .init(),
       consecutiveBackSpaceCount: 0,
@@ -220,10 +261,13 @@ extension InputHandlerProtocol {
     session.switchState(generateStateOfInputting(guarded: true))
   }
 
-  /// 對帳：注拼槽內容若已在別處被固化／清空，輸入鍵序列即失效。
+  /// 對帳：注拼槽內容若已在別處被固化／清空，輸入鍵序列即失效、連續誤鍵計次一併歸零
+  /// （組字內容成功成文＝確為中文打字）。
   func reconcileSmartEnglishKeyTrail() {
     if composer.isEmpty, smartEnglishContext.lastKnownComposerWasNonEmpty {
       smartEnglishContext.keyTrail.removeAll()
+      smartEnglishContext.consecutiveTypingErrorCount = 0
+      smartEnglishContext.analyzedViolationCount = 0
     }
     smartEnglishContext.lastKnownComposerWasNonEmpty = !composer.isEmpty
   }

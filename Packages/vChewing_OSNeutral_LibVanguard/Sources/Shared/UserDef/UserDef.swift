@@ -54,6 +54,7 @@ public enum UserDef: String, CaseIterable, Identifiable, Sendable {
   case kEnableLatchedAlnumStateInMixedAlnumMode = "EnableLatchedAlnumStateInMixedAlnumMode"
   case kSmartEnglishAutoSwitchEnabled = "SmartEnglishAutoSwitchEnabled"
   case kSmartEnglishAutoSwitchIdleTimeoutMS = "SmartEnglishAutoSwitchIdleTimeoutMS"
+  case kSmartEnglishAutoSwitchErrorThreshold = "SmartEnglishAutoSwitchErrorThreshold"
   case kFuriousTypingEnabled = "FuriousTypingEnabled"
   case kCNS11643Enabled = "CNS11643Enabled"
   case kSymbolInputEnabled = "SymbolInputEnabled"
@@ -395,6 +396,7 @@ extension UserDef {
     case .kCandidateListTextSize: 12 ... 196
     case .kPopupCompositionBufferTextSize: 18 ... 40
     case .kSmartEnglishAutoSwitchIdleTimeoutMS: 100 ... 3_000
+    case .kSmartEnglishAutoSwitchErrorThreshold: 3 ... 8
     default: nil
     }
   }
@@ -482,6 +484,7 @@ extension UserDef {
     case .kEnableLatchedAlnumStateInMixedAlnumMode: return .bool(false)
     case .kSmartEnglishAutoSwitchEnabled: return .bool(true)
     case .kSmartEnglishAutoSwitchIdleTimeoutMS: return .integer(500)
+    case .kSmartEnglishAutoSwitchErrorThreshold: return .integer(5)
     case .kFuriousTypingEnabled: return .bool(true)
     case .kCNS11643Enabled: return .bool(false)
     case .kSymbolInputEnabled: return .bool(true)
@@ -793,6 +796,19 @@ extension UserDef {
           800: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.800",
           1_000: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1000",
           1_500: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1500",
+        ]
+      )
+    case .kSmartEnglishAutoSwitchErrorThreshold: return .init(
+        userDef: self,
+        shortTitle: "i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.shortTitle",
+        description: "i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.description",
+        options: [
+          3: "i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.3",
+          4: "i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.4",
+          5: "i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.5",
+          6: "i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.6",
+          7: "i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.7",
+          8: "i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.8",
         ]
       )
     case .kFuriousTypingEnabled: return .init(

@@ -449,6 +449,14 @@
 "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.800" = "0.8 s";
 "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1000" = "1 s";
 "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1500" = "1.5 s";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.shortTitle" = "Auto-switch after consecutive typing errors:";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.description" = "Even when every key pressed is a valid key for the IME, this many consecutive implausible input orders (for example a re-typed initial consonant, or an out-of-order slot) auto-switch the output to English. Pressing Backspace before any English output resets the count, because it means you are still typing Chinese and simply hit a wrong key; a successful composition also resets it.";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.3" = "3 times";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.4" = "4 times";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.5" = "5 times";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.6" = "6 times";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.7" = "7 times";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.8" = "8 times";
 "i18n:UserDef.kNumPadCharInputBehavior.description" = "Choose the behavior of numeric pad inputs.";
 "i18n:UserDef.kNumPadCharInputBehavior.option.0" = "Always directly commit half-width chars";
 "i18n:UserDef.kNumPadCharInputBehavior.option.1" = "Always directly commit full-width chars";

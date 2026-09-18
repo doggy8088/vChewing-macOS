@@ -449,6 +449,14 @@
 "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.800" = "0.8 秒";
 "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1000" = "1 秒";
 "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1500" = "1.5 秒";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.shortTitle" = "連続誤キーで自動切替するしきい値:";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.description" = "すべてのキーが妥当なキーであっても、不合理な入力順（声母の上書き、スロット順の逆転など）がこの回数だけ連続すると、英文出力へ自動的に切り替えます。英文出力の前に BackSpace を押すと計数はリセットされます（中国語入力の打ち間違いと見做すため）。組字が成功したときもリセットされます。";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.3" = "3 回";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.4" = "4 回";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.5" = "5 回";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.6" = "6 回";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.7" = "7 回";
+"i18n:UserDef.kSmartEnglishAutoSwitchErrorThreshold.option.8" = "8 回";
 "i18n:UserDef.kNumPadCharInputBehavior.description" = "テンキー文字の入力行為をご指定ください。";
 "i18n:UserDef.kNumPadCharInputBehavior.option.0" = "いつでも半角で直接出力";
 "i18n:UserDef.kNumPadCharInputBehavior.option.1" = "いつでも全角で直接出力";
