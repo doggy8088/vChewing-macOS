@@ -518,4 +518,88 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     #expect(testSession.recentCommissions == ["pro"])
     #expect(!testSession.recentCommissions.joined().contains("\t"))
   }
+
+  // MARK: - 連續誤鍵自動轉英
+
+  @Test
+  func test_SES030_ConsecutiveTypingErrorsTriggerEnglish() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 預設門檻 5：`cdcdcd` 每個聲母重複鍵各計一次誤鍵（共 6 次）。
+    #expect(testHandler.smartEnglishErrorThreshold == 5)
+    ["c", "d", "c", "d", "c"].forEach { _ = triageKey($0) }
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 4)
+    // 第六鍵達門檻：自動轉英、本拍按鍵被消費、不附加空格。
+    #expect(triageKey("d"))
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == "cdcdcd")
+  }
+
+  @Test
+  func test_SES031_BackspaceResetsConsecutiveTypingErrors() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    ["c", "d", "c"].forEach { _ = triageKey($0) }
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 2)
+    // 尚未輸出英文前的 BackSpace＝使用者想打中文、只是打錯鍵：計次歸零。
+    _ = triageKey(
+      KBEvent.SpecialKey.backspace.unicodeScalar.description,
+      keyCode: KeyCode.kBackSpace.rawValue
+    )
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 0)
+    #expect(!testHandler.isSmartEnglishModeActive)
+    // 退格後序列一併失效、重新累計：`cdcd` 累積 3 次誤鍵，尚未達門檻 5。
+    ["c", "d", "c", "d"].forEach { _ = triageKey($0) }
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 3)
+    #expect(!testHandler.isSmartEnglishModeActive)
+    _ = triageKey("c")
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 4)
+    #expect(triageKey("d"))
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == "cdcdcd")
+  }
+
+  @Test
+  func test_SES032_ErrorThresholdPreferenceIsRespected() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
+    defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
+    testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
+    #expect(testHandler.smartEnglishErrorThreshold == 3)
+    ["c", "d", "c"].forEach { _ = triageKey($0) }
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(triageKey("d"))
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == "cdcd")
+  }
+
+  @Test
+  func test_SES033_CompositionCommitResetsConsecutiveTypingErrors() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    ["c", "d"].forEach { _ = triageKey($0) }
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors >= 1)
+    #expect(!testHandler.isSmartEnglishModeActive)
+    // 成功組字成文（`2u,6` ＝ ㄉㄧㄝˊ）之後，下一拍對帳即歸零。
+    typeSentence("2u,6")
+    _ = triageKey("c")
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 0)
+    #expect(testHandler.smartEnglishKeyTrail == ["c"])
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(!testSession.recentCommissions.contains { $0.contains("cd") })
+  }
 }

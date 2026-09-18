@@ -40,6 +40,7 @@
         Section {
           UserDef.kSmartEnglishAutoSwitchEnabled.renderUI()
           UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.renderUI()
+          UserDef.kSmartEnglishAutoSwitchErrorThreshold.renderUI()
         }
 
         Section {

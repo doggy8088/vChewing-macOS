@@ -30,6 +30,11 @@ public struct SmartEnglishTypingContext {
   public var keyTrail: [String] = []
   /// 上次分診時，注拼槽內是否有內容（用來偵測注拼槽被別處清空的時機）。
   public var lastKnownComposerWasNonEmpty: Bool = false
+  /// 連續誤鍵計次：序列中每次新增「不合理的中文輸入順序」違規即累計；
+  /// 按 BackSpace 或成功成文（組字內容被固化／遞交）時歸零。
+  public var consecutiveTypingErrorCount: Int = 0
+  /// 上次分析當前序列所得的違規總數（用來計算逐鍵增量）。
+  public var analyzedViolationCount: Int = 0
   /// 英數暫存模式的執行期狀態；`nil` 表示目前不在該模式內。
   public var mode: SmartEnglishModeState?
 }
@@ -38,8 +43,10 @@ public struct SmartEnglishTypingContext {
 public struct SmartEnglishTrailAnalysis {
   /// 序列中是否至少有一個當前注音排列可吃的注音鍵。
   public var containsZhuyinKey: Bool = false
+  /// 序列中「違規」的累計次數（每個觸發違規的按鍵各計一次）。
+  public var violationCount: Int = 0
   /// 序列是否出現「不合理的中文輸入順序」。
-  public var containsViolation: Bool = false
+  public var containsViolation: Bool { violationCount > 0 }
 }
 
 // MARK: - 輸入鍵序列的中文合理性分析
@@ -81,7 +88,7 @@ enum SmartEnglishTrailAnalyzer {
 
     /// 收束當前音節（聲調鍵到來時呼叫）。
     func flushSyllable() {
-      if !isStemSane() { result.containsViolation = true }
+      if !isStemSane() { result.violationCount += 1 }
       consonant = ""
       semivowel = ""
       vowel = ""
@@ -90,14 +97,14 @@ enum SmartEnglishTrailAnalyzer {
 
     for key in keyTrail {
       guard key.unicodeScalars.count == 1 else {
-        result.containsViolation = true
+        result.violationCount += 1
         continue
       }
       var probe = Tekkon.Composer("", arrange: parser)
       _ = probe.receiveKey(fromString: key)
       guard !probe.isEmpty else {
         // 該鍵不是當前注音排列可吃的鍵（含大小寫不合者）。
-        result.containsViolation = true
+        result.violationCount += 1
         continue
       }
       result.containsZhuyinKey = true
@@ -107,17 +114,17 @@ enum SmartEnglishTrailAnalyzer {
         vowel = probe.vowel.value
         highestFilledSlot = max(highestFilledSlot, 3)
       } else if !probe.semivowel.isEmpty {
-        if highestFilledSlot > 2 { result.containsViolation = true }
+        if highestFilledSlot > 2 { result.violationCount += 1 }
         semivowel = probe.semivowel.value
         highestFilledSlot = max(highestFilledSlot, 2)
       } else {
-        if highestFilledSlot >= 1 { result.containsViolation = true }
+        if highestFilledSlot >= 1 { result.violationCount += 1 }
         consonant = probe.consonant.value
         highestFilledSlot = max(highestFilledSlot, 1)
       }
     }
     // 收尾：序列最後仍未收束的音節。
-    if !isStemSane() { result.containsViolation = true }
+    if !isStemSane() { result.violationCount += 1 }
     return result
   }
 }

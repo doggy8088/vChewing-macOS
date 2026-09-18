@@ -35,4 +35,29 @@ extension LibVanguardTestsRoot.InputHandlerTests.Session {
     diagSmartEnglish("after Tab")
     #expect(testClientProxy.committedText == "./build")
   }
+
+  @Test
+  func test_SESR02_RealSessionConsecutiveErrorThreshold() throws {
+    resetToAbortionAndClear()
+    // 全為合理按鍵、但輸入順序一路不合理：預設門檻 5 時第 6 鍵即自動轉英。
+    let keys: [KBEvent.KeyEventData] = ["c", "d", "c", "d", "c", "d"].map { KBEvent.KeyEventData(chars: $0) }
+    keys.forEach { press($0) }
+    diagSmartEnglish("after cdcdcd")
+    #expect(testClientProxy.committedText == "cdcdcd")
+    #expect(testHandler.isSmartEnglishModeActive)
+    // 進入英數暫存模式後，後續鍵入逐字遞交。
+    press(KBEvent.KeyEventData(chars: "e"))
+    #expect(testClientProxy.committedText == "cdcdcde")
+  }
+
+  @Test
+  func test_SESR03_RealSessionBackspaceResetsErrorCount() throws {
+    resetToAbortionAndClear()
+    ["c", "d", "c"].forEach { press(KBEvent.KeyEventData(chars: $0)) }
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 2)
+    press(KBEvent.KeyEventData.backspace, shouldHandle: true)
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 0)
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(testClientProxy.committedText.isEmpty)
+  }
 }
