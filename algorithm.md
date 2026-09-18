@@ -22,6 +22,7 @@
 - [打字管理器 LibVanguard 與輸入態械管理](#輸入態械osneutralassembly)
   - [KBEvent 轉換與分診](#kbevent-轉換與分診)
   - [IMEState 狀態與轉移](#imestate-狀態與轉移)
+  - [智慧中英輸入自動切換（Smart ZH-EN Auto-Switch）](#智慧中英輸入自動切換smart-zh-en-auto-switch)
 - [組句引擎：Homa（DAG 動態規劃）](#組句引擎homadag-動態規劃)
   - [資料模型](#資料模型)
   - [尋路演算法（PathFinder）](#演算法pathfinder)
@@ -97,6 +98,19 @@ LibVanguard 是可以在 Linux 系統下建置的 Swift Package，以一個比�
   - 候選視窗開關與列表。
   - 特殊模式（標點、數字小鍵盤、日期巨集）。
 - 請以新增顯式狀態與轉移來擴展，不建議用旗標繞過既有流程。
+
+### 智慧中英輸入自動切換（Smart ZH-EN Auto-Switch）
+
+使用者常態停留於唯音的中文模式；唯音自行辨識「這串按鍵其實是英文」並就地轉為英文輸出，不必切換到 ABC 輸入法。實作見
+`Packages/vChewing_OSNeutral_LibVanguard/Sources/LibVanguard/InputHandler/InputHandler_SmartEnglishAutoSwitch.swift`
+與同目錄的 `InputHandler_SmartEnglishTrailAnalyzer.swift`；需求規格見倉根 `PRD.md`。
+
+- **輸入鍵序列（key trail）**：`InputHandler` 自上次組字內容被固化／遞交之後，逐一記錄使用者敲下的可列印 ASCII 鍵（`smartEnglishContext.keyTrail`）。組字內容一旦遞交（`clear()`）或注拼槽被別處清空（惰性對帳），序列即失效。
+- **觸發**：皆只在 `.ofEmpty` / `.ofInputting` 狀態、且限注音鍵盤（非拼音、非狂拼、非磁帶、非中英混打、非英數模式）：
+  - **Tab**：序列非空時無條件轉英，Tab 按鍵放行給客體（自動完成）。
+  - **Space**：序列被判定為「不合理的中文輸入順序」時轉英，並附帶一個半形空格（本拍空格由唯音消費）。
+- **合理性分析**（`SmartEnglishTrailAnalyzer`）：以當前注音排列逐鍵模擬聲介韻調四槽；出現「無效鍵」「聲母槽破壞性覆寫（`cd` ＝ ㄏㄎ）」「槽位順序倒錯（`ls` ＝ ㄠㄋ）」「收尾音節既非合法音節亦非任何合法音節前綴（`vi` ＝ ㄒㄛ）」任一情形即為不合理。
+- **英數暫存模式**：不離開唯音、不切換系統輸入法，也不改動 `isASCIIMode`；可列印 ASCII 一律原樣逐一遞交（不維護未遞交緩衝區）。BackSpace 放行給客體刪除，連續 3 次取消並還原觸發前的注拼槽與輸入鍵序列；Enter／Esc 結束模式；閒置逾時（`SmartEnglishAutoSwitchIdleTimeoutMS`，預設 500 ms）自動回到中文模式，且該逾時亦為「連續 BackSpace」的間隔上限；其餘按鍵放行並維持模式。
 
 ---
 
@@ -220,6 +234,7 @@ LexiconAssembly 對多個子語言模型進行匯整、去重、替換與增益�
 
 ## 文件版本與更新紀錄
 
-- 文件版本：1.6
-- 最後更新：2026-09-06
+- 文件版本：1.7
+- 最後更新：2026-09-18
 - 適用版本：vChewing 4.7.3 SP1（Build 4731）及之後的版本
+- 1.7：新增「智慧中英輸入自動切換（Smart ZH-EN Auto-Switch）」一節（`PRD.md` 為其需求規格）。

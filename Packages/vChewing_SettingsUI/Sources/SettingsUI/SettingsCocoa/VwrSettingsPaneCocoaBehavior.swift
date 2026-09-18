@@ -90,6 +90,16 @@ extension SettingsPanesCocoa {
           // 真要做就得另掛 UserDefaults 的變更觀察，再遞迴走訪子列之 NSView 樹設 isEnabled。
         }?.boxed()
         NSStackView.buildSection(width: contentWidth) {
+          UserDef.kSmartEnglishAutoSwitchEnabled.renderCocoa(
+            fixWidth: contentWidth,
+            prefUITab: .tabBehavior
+          )
+          UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.renderCocoa(
+            fixWidth: contentWidth,
+            prefUITab: .tabBehavior
+          )
+        }?.boxed()
+        NSStackView.buildSection(width: contentWidth) {
           UserDef.kSpaceKeyBehaviorAgainstICB.renderCocoa(
             fixWidth: contentWidth,
             prefUITab: .tabBehavior
