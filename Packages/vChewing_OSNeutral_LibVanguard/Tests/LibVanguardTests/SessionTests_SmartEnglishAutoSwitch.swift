@@ -60,4 +60,19 @@ extension LibVanguardTestsRoot.InputHandlerTests.Session {
     #expect(!testHandler.isSmartEnglishModeActive)
     #expect(testClientProxy.committedText.isEmpty)
   }
+
+  @Test
+  func test_SESR04_RealSessionPunctuationThenChineseStaysChinese() throws {
+    resetToAbortionAndClear()
+    // 使用者實機情境：以 `<` 鍵輸入「，」再打「終於」（終 ＝ ㄓㄨㄥ，空白鍵為一聲）。
+    // 標點是正常的中文輸入，不得被計為誤鍵、也不得因此把後續的中文輸入轉成英文。
+    ["<", "5", "j", "/", " "].forEach { press(KBEvent.KeyEventData(chars: $0)) }
+    diagSmartEnglish("after ，終於")
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 0)
+    #expect(testClientProxy.committedText.isEmpty)
+    #expect(!testHandler.smartEnglishKeyTrail.contains("<"))
+    #expect(testSession.state.displayedText.contains("，"))
+    #expect(!testSession.state.displayedText.contains("<"))
+  }
 }

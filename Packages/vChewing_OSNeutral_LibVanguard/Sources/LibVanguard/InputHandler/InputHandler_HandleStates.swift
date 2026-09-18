@@ -831,9 +831,10 @@ extension InputHandlerProtocol {
     inputting.textToCommit = textToCommit
     session.switchState(inputting)
 
-    // 智慧中英自動切換：這個全形標點是在輸入鍵序列非空時敲進來的（例如 `https://` 的 `:`），
-    // 記下此事，供轉英時判定「該標點出自同一批按鍵、應改以半形輸出」。
+    // 智慧中英自動切換：這個標點是在輸入鍵序列非空時敲進來的（例如 `https://` 的 `:`、
+    // 以 `<` 鍵輸入的「，」），記下此事並自序列移除該鍵——標點是正常輸入、不是誤鍵。
     noteSmartEnglishTrailOwnedPunctuation(
+      insertedKey: customPunctuation,
       displayedPunctuation: committableDisplayText(sansReading: true).last.map(String.init)
     )
 

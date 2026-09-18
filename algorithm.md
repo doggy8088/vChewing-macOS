@@ -105,14 +105,15 @@ LibVanguard 是可以在 Linux 系統下建置的 Swift Package，以一個比�
 `Packages/vChewing_OSNeutral_LibVanguard/Sources/LibVanguard/InputHandler/InputHandler_SmartEnglishAutoSwitch.swift`
 與同目錄的 `InputHandler_SmartEnglishTrailAnalyzer.swift`；需求規格見倉根 `PRD.md`。
 
-- **輸入鍵序列（key trail）**：`InputHandler` 自上次組字內容被固化／遞交之後，逐一記錄使用者敲下的可列印 ASCII 鍵（`smartEnglishContext.keyTrail`）。組字內容一旦遞交（`clear()`）或注拼槽被別處清空（惰性對帳），序列即失效。
+- **輸入鍵序列（key trail）**：`InputHandler` 自上次組字內容被固化／遞交之後，逐一記錄使用者敲下的可列印 ASCII 鍵（`smartEnglishContext.keyTrail`）。組字內容一旦遞交（`clear()`）或注拼槽被別處清空（惰性對帳），序列即失效。凡被標點鏈路吃下的按鍵（其輸出已由組字器承擔）會自序列移除（見下）。
 - **觸發**：皆只在 `.ofEmpty` / `.ofInputting` 狀態、且限注音鍵盤（非拼音、非狂拼、非磁帶、非中英混打、非英數模式）：
   - **Tab**：序列非空時無條件轉英，Tab 按鍵放行給客體（自動完成）。
   - **Space**：序列被判定為「不合理的中文輸入順序」時轉英，並附帶一個半形空格（本拍空格由唯音消費）。
   - **連續誤鍵**：逐鍵累計新增的違規次數，達門檻（`SmartEnglishAutoSwitchErrorThreshold`，3–8、預設 5）時立即轉英（不附空格）；按 BackSpace（未轉英前）或成功成文即歸零。
 - **合理性分析**（`SmartEnglishTrailAnalyzer`）：以當前注音排列逐鍵模擬聲介韻調四槽；出現「無效鍵」「聲母槽破壞性覆寫（`cd` ＝ ㄏㄎ）」「槽位順序倒錯（`ls` ＝ ㄠㄋ）」「收尾音節既非合法音節亦非任何合法音節前綴（`vi` ＝ ㄒㄛ）」「死鍵（同鍵連按、槽位內容不變，如 URL 的 `//` ＝ ㄥㄥ）」任一情形即為不合理。
+- **標點鍵不是誤鍵**：凡一鍵被 `handlePunctuation` 成功併入組字器，即由 `noteSmartEnglishTrailOwnedPunctuation` 自輸入鍵序列移除（其輸出已由組字器承擔），不參與合理性分析、亦不計連續誤鍵（若原本已計入則扣回），並把組字區的顯示字元登記進 `smartEnglishContext.trailOwnedPunctuations`（依輸入順序可多筆）。此舉修正實機問題：以 `<` 鍵輸入「，」後打「終於」再按空白鍵（一聲）時，`<` 被當成無效鍵累計誤鍵，導致空白鍵被誤判為轉英觸發點。
 - **英數暫存模式**：不離開唯音、不切換系統輸入法，也不改動 `isASCIIMode`；可列印 ASCII 一律原樣逐一遞交（不維護未遞交緩衝區）。BackSpace 放行給客體刪除，連續 3 次取消並還原觸發前的注拼槽與輸入鍵序列；Enter／Esc 結束模式；閒置逾時（`SmartEnglishAutoSwitchIdleTimeoutMS`，預設 500 ms）自動回到中文模式，且該逾時亦為「連續 BackSpace」的間隔上限；其餘按鍵放行並維持模式。觸發逾時的那一拍按鍵會改走中文模式分診，且**照常記入輸入鍵序列**（等同中文模式下的新按鍵）——否則該鍵（或其併入組字器的全形標點）不會被視為同一批按鍵，轉英時將殘留全形字元。
-- **半形輸出保證**：轉英時會自中文前綴尾端處理掉「其實出自同一批按鍵」的全形標點（`sanitizedChinesePrefixForSmartEnglish`）：該字元能對應回半形、且該半形字元仍存在於輸入鍵序列中時予以剔除（由序列輸出半形）；若序列已因對帳失去該鍵、但該標點確為序列所產生（`smartEnglishContext.trailOwnedPunctuation`，由 `handlePunctuation` 於插入成功後記下組字區的顯示字元）且仍留在組字器內時，就地改寫為半形。故 `https` 接續 `://` 恆輸出 `https://` 而非 `：://`，實機上偶發的「序列失去 `:`、組字器仍留有 `：`」狀態亦涵蓋在內；不具對應半形字元的中文標點（如「，」）一律保留。
+- **半形輸出保證**：轉英時會自中文前綴尾端處理掉「其實出自同一批按鍵」的標點（`sanitizedChinesePrefixForSmartEnglish`）：先是前綴尾端若為 `trailOwnedPunctuations` 的連續串即整段取出、改以半形寫回（該半形字元若已由序列承擔則整段剔除，避免重複）；其餘「半形對應字元仍存在於輸入鍵序列中」的尾端全形字元亦一併剔除（由序列輸出半形）。故 `https` 接續 `://` 恆輸出 `https://` 而非 `：://`（`:` 未併入組字器時，半形本來就由序列承擔，輸出一致）；不具對應半形、亦非序列自產的中文標點（如使用者正常輸入的「，」）一律保留。
 
 ---
 
