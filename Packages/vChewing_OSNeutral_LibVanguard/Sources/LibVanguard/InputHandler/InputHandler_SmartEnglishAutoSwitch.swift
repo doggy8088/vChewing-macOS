@@ -83,6 +83,7 @@ extension InputHandlerProtocol {
     // Tab：無條件把輸入鍵序列轉為英文，並將 Tab 放行給客體（自動完成）。
     if input.isTab, !input.isHoldingAny([.command, .control, .option]) {
       guard !smartEnglishContext.keyTrail.isEmpty else { return nil }
+      vCLog("SmartEnglish: Tab trigger; trail=\(smartEnglishContext.keyTrail.joined())")
       triggerSmartEnglishMode(appendingSpace: false)
       return false
     }
@@ -92,6 +93,8 @@ extension InputHandlerProtocol {
       let analysis = analyzeSmartEnglishKeyTrail()
       // 序列中連一個注音鍵都沒有時（例如單引號類標點）不視為英文，維持既有標點行為。
       if analysis.containsZhuyinKey, analysis.containsViolation {
+        let trailJoined = smartEnglishContext.keyTrail.joined()
+        vCLog("SmartEnglish: Space trigger; trail=\(trailJoined)")
         triggerSmartEnglishMode(appendingSpace: true)
         return true
       }
@@ -150,6 +153,7 @@ extension InputHandlerProtocol {
       mode.lastActivityDate = now
       smartEnglishContext.mode = mode
       if mode.consecutiveBackSpaceCount >= Self.smartEnglishBackspaceCancellationCount {
+        vCLog("SmartEnglish: three consecutive backspaces; cancel English mode.")
         exitSmartEnglishMode(restoreChineseComposition: true)
       }
       return false
@@ -198,6 +202,7 @@ extension InputHandlerProtocol {
     )
     let textToCommit = chineseText + englishText + (appendingSpace ? " " : "")
     guard !textToCommit.isEmpty else { return }
+    vCLog("SmartEnglish: commit \(textToCommit.debugDescription) and enter English mode.")
     session.switchState(State.ofCommitting(textToCommit: textToCommit))
   }
 
@@ -206,6 +211,7 @@ extension InputHandlerProtocol {
   public func exitSmartEnglishMode(restoreChineseComposition: Bool) {
     guard let mode = smartEnglishContext.mode else { return }
     smartEnglishContext.mode = nil
+    vCLog("SmartEnglish: exit English mode; restore=\(restoreChineseComposition).")
     guard restoreChineseComposition, let session else { return }
     composer = mode.restoreSnapshot.composer
     smartEnglishContext.keyTrail = mode.restoreSnapshot.keyTrail
