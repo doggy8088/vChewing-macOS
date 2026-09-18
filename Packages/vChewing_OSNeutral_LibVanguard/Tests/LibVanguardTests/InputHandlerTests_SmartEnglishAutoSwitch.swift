@@ -689,4 +689,52 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     #expect(!testHandler.isSmartEnglishModeActive)
     #expect(testHandler.smartEnglishConsecutiveTypingErrors < testHandler.smartEnglishErrorThreshold)
   }
+
+  // MARK: - URL 情境（全形標點於序列對帳後遺失該鍵）
+
+  @Test
+  func test_SES045_TrailOwnedPunctuationConvertsToHalfWidthWhenTrailLostTheKey() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 實機（Ghostty）觀察到的偶發狀態：`:` 曾在輸入鍵序列對帳時遺失，
+    // 但組字器仍保有全形 `：`，導致轉英輸出成「：//ww」。
+    // 此處直接重現該狀態，驗證半形輸出保證不因序列內容變動而失效。
+    let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
+    defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
+    testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
+    _ = triageKey(":")
+    #expect(testHandler.committableDisplayText(sansReading: true).contains("："))
+    #expect(
+      testHandler.smartEnglishContext.trailOwnedPunctuation == "：",
+      "owned=\(String(describing: testHandler.smartEnglishContext.trailOwnedPunctuation))"
+    )
+    testHandler.smartEnglishContext.keyTrail.removeAll { $0 == ":" }
+    ["/", "/", "w", "w"].forEach { _ = triageKey($0) }
+    #expect(testHandler.isSmartEnglishModeActive)
+    // 觸發時遞交的內容與後續英數暫存模式的逐字遞交，接起來必須是半形的 `://ww`。
+    let commissions = testSession.recentCommissions.joined()
+    #expect(commissions.contains("://ww"), "commissions=\(testSession.recentCommissions)")
+    #expect(!commissions.contains("："), "commissions=\(testSession.recentCommissions)")
+  }
+
+  @Test
+  func test_SES046_ChinesePrefixSanitizerConvertsOnlyTrailOwnedPunctuation() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 序列仍保有半形 `:`：走「剔除」，由序列承擔輸出。
+    testHandler.smartEnglishContext.trailOwnedPunctuation = "："
+    #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: [":", "/"]) == "")
+    // 序列已失去該鍵、但該標點確為序列所產生：改寫為半形，不重複、也不殘留全形。
+    #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: ["/", "/"]) == ":")
+    // 非序列所產生的中文標點（例如使用者自行輸入的 `，`）一律保留原樣。
+    testHandler.smartEnglishContext.trailOwnedPunctuation = nil
+    #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("話，", trail: ["w", "w"]) == "話，")
+    #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: ["c", "d"]) == "：")
+  }
 }

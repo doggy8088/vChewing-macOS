@@ -112,7 +112,7 @@ LibVanguard 是可以在 Linux 系統下建置的 Swift Package，以一個比�
   - **連續誤鍵**：逐鍵累計新增的違規次數，達門檻（`SmartEnglishAutoSwitchErrorThreshold`，3–8、預設 5）時立即轉英（不附空格）；按 BackSpace（未轉英前）或成功成文即歸零。
 - **合理性分析**（`SmartEnglishTrailAnalyzer`）：以當前注音排列逐鍵模擬聲介韻調四槽；出現「無效鍵」「聲母槽破壞性覆寫（`cd` ＝ ㄏㄎ）」「槽位順序倒錯（`ls` ＝ ㄠㄋ）」「收尾音節既非合法音節亦非任何合法音節前綴（`vi` ＝ ㄒㄛ）」「死鍵（同鍵連按、槽位內容不變，如 URL 的 `//` ＝ ㄥㄥ）」任一情形即為不合理。
 - **英數暫存模式**：不離開唯音、不切換系統輸入法，也不改動 `isASCIIMode`；可列印 ASCII 一律原樣逐一遞交（不維護未遞交緩衝區）。BackSpace 放行給客體刪除，連續 3 次取消並還原觸發前的注拼槽與輸入鍵序列；Enter／Esc 結束模式；閒置逾時（`SmartEnglishAutoSwitchIdleTimeoutMS`，預設 500 ms）自動回到中文模式，且該逾時亦為「連續 BackSpace」的間隔上限；其餘按鍵放行並維持模式。
-- **半形輸出保證**：轉英時會自中文前綴尾端剔除「其實出自同一批按鍵」的全形標點（`sanitizedChinesePrefixForSmartEnglish`：該字元必須能對應回半形、且該半形字元確實存在於輸入鍵序列中），故 `https` 接續 `://` 恆輸出 `https://` 而非 `：://`；不具對應半形字元的中文標點（如「，」）一律保留。
+- **半形輸出保證**：轉英時會自中文前綴尾端處理掉「其實出自同一批按鍵」的全形標點（`sanitizedChinesePrefixForSmartEnglish`）：該字元能對應回半形、且該半形字元仍存在於輸入鍵序列中時予以剔除（由序列輸出半形）；若序列已因對帳失去該鍵、但該標點確為序列所產生（`smartEnglishContext.trailOwnedPunctuation`，由 `handlePunctuation` 於插入成功後記下組字區的顯示字元）且仍留在組字器內時，就地改寫為半形。故 `https` 接續 `://` 恆輸出 `https://` 而非 `：://`，實機上偶發的「序列失去 `:`、組字器仍留有 `：`」狀態亦涵蓋在內；不具對應半形字元的中文標點（如「，」）一律保留。
 
 ---
 
