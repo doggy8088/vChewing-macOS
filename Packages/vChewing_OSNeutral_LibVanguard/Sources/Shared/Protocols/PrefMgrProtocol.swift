@@ -99,6 +99,7 @@ public protocol PrefMgrProtocol {
   var enableLatchedAlnumStateInMixedAlnumMode: Bool { get set }
   var smartEnglishAutoSwitchEnabled: Bool { get set }
   var smartEnglishAutoSwitchIdleTimeoutMS: Int { get set }
+  var smartEnglishAutoSwitchErrorThreshold: Int { get set }
   var furiousTypingEnabled4Pinyin: Bool { get set }
   var furiousTypingEnabled4Zhuyin: Bool { get set }
   var symbolInputEnabled: Bool { get set }

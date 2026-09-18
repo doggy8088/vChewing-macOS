@@ -376,6 +376,9 @@ public final class PrefMgr: PrefMgrProtocol, Sendable {
   @AppProperty(userDef: .kSmartEnglishAutoSwitchIdleTimeoutMS)
   public var smartEnglishAutoSwitchIdleTimeoutMS: Int
 
+  @AppProperty(userDef: .kSmartEnglishAutoSwitchErrorThreshold)
+  public var smartEnglishAutoSwitchErrorThreshold: Int
+
   @AppProperty(userDef: .kFuriousTypingEnabled4Pinyin)
   public var furiousTypingEnabled4Pinyin: Bool
 
