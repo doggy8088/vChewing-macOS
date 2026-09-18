@@ -346,6 +346,12 @@ public final class PrefMgr: PrefMgrProtocol, Sendable {
   @AppProperty(userDef: .kEnableLatchedAlnumStateInMixedAlnumMode)
   public var enableLatchedAlnumStateInMixedAlnumMode: Bool
 
+  @AppProperty(userDef: .kSmartEnglishAutoSwitchEnabled)
+  public var smartEnglishAutoSwitchEnabled: Bool
+
+  @AppProperty(userDef: .kSmartEnglishAutoSwitchIdleTimeoutMS)
+  public var smartEnglishAutoSwitchIdleTimeoutMS: Int
+
   @AppProperty(userDef: .kFuriousTypingEnabled)
   public var furiousTypingEnabled: Bool
 

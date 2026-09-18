@@ -47,6 +47,7 @@ public protocol InputHandlerProtocol: AnyObject {
   var strCodePointBuffer: String { get set } // 內碼輸入專用組碼區
   var calligrapher: String { get set } // 磁帶專用組筆區
   var mixedAlnumConfig: MixedAlnumConfig { get set } // 中英混打模式之執行期狀態
+  var smartEnglishContext: SmartEnglishTypingContext { get set } // 智慧中英自動切換的執行期上下文
   var furiousConfig: FuriousTypingConfig { get set } // 狂拼模式之執行期狀態
   var composer: Tekkon.Composer { get set } // 注拼槽
   var assembler: Homa.Assembler { get set } // 組字器
@@ -243,6 +244,8 @@ extension InputHandlerProtocol {
     currentTypingMethod = .vChewingFactory
     backupCursor = nil
     furiousConfig.resetAll() // 狀態重置：狂拼之整批執行期狀態（trail＋當拍狀態）一併失效。
+    // 智慧中英自動切換：組字內容既已遞交／重置，輸入鍵序列即失效（英數暫存模式本身不受影響）。
+    resetSmartEnglishKeyTrail()
   }
 
   /// 解除中英混打之「閂滯於英打」狀態。

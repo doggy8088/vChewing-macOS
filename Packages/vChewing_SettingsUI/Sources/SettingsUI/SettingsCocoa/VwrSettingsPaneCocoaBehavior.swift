@@ -81,6 +81,16 @@ extension SettingsPanesCocoa {
           // 所需之前提已寫進該選項之 description（「需先啟用上方選項」），兩側面板皆適用。
         }?.boxed()
         NSStackView.buildSection(width: contentWidth) {
+          UserDef.kSmartEnglishAutoSwitchEnabled.renderCocoa(
+            fixWidth: contentWidth,
+            prefUITab: .tabBehavior
+          )
+          UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.renderCocoa(
+            fixWidth: contentWidth,
+            prefUITab: .tabBehavior
+          )
+        }?.boxed()
+        NSStackView.buildSection(width: contentWidth) {
           UserDef.kSpaceKeyBehaviorAgainstICB.renderCocoa(
             fixWidth: contentWidth,
             prefUITab: .tabBehavior

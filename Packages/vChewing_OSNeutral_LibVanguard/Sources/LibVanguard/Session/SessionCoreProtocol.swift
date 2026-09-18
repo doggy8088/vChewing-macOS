@@ -142,6 +142,8 @@ extension SessionCoreProtocol {
     // （繁簡切換、`commitComposition()`、輸入法關閉、`performServerDeactivation()` 等皆經此），
     // 故一律靜默解除。
     inputHandler.releaseLatchedAlnumState(announce: false)
+    // 智慧中英自動切換：任何層級的會話重置（失焦、CapsLock 切換等）一律結束英數暫存模式。
+    inputHandler.resetSmartEnglishAutoSwitchState()
     guard commitExisting else {
       switchState(.ofEmpty())
       return

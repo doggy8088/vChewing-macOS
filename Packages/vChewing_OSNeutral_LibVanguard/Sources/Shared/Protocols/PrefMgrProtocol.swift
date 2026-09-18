@@ -89,6 +89,8 @@ public protocol PrefMgrProtocol {
   var cassetteEnabled: Bool { get set }
   var mixedAlphanumericalEnabled: Bool { get set }
   var enableLatchedAlnumStateInMixedAlnumMode: Bool { get set }
+  var smartEnglishAutoSwitchEnabled: Bool { get set }
+  var smartEnglishAutoSwitchIdleTimeoutMS: Int { get set }
   var furiousTypingEnabled: Bool { get set }
   var symbolInputEnabled: Bool { get set }
   var suppressFactoryUnigramsOfKanaSyllables: Bool { get set }

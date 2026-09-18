@@ -63,6 +63,7 @@ public final class MockInputHandler: @MainActor InputHandlerProtocol {
   public var strCodePointBuffer = ""
   public var calligrapher = ""
   public var mixedAlnumConfig = MixedAlnumConfig()
+  public var smartEnglishContext = SmartEnglishTypingContext() // 智慧中英自動切換的執行期上下文
   public var furiousConfig = FuriousTypingConfig() // 狂拼模式之執行期狀態
   public var composer: Tekkon.Composer = .init()
   public var assembler: Homa.Assembler

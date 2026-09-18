@@ -72,6 +72,7 @@ public final class InputHandler: InputHandlerProtocol {
   public var strCodePointBuffer = "" // 內碼輸入專用組碼區
   public var calligrapher = "" // 磁帶專用組筆區
   public var mixedAlnumConfig = MixedAlnumConfig() // 中英混打模式之執行期狀態
+  public var smartEnglishContext = SmartEnglishTypingContext() // 智慧中英自動切換的執行期上下文
   public var furiousConfig = FuriousTypingConfig() // 狂拼模式之執行期狀態
   public var composer: Composer = .init() // 注拼槽
   public var assembler: Assembler // 組字器

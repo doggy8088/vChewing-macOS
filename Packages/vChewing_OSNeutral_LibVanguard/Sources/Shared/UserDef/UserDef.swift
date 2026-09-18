@@ -52,6 +52,8 @@ public enum UserDef: String, CaseIterable, Identifiable, Sendable {
   case kCassetteEnabled = "CassetteEnabled"
   case kMixedAlphanumericalEnabled = "MixedAlphanumericalEnabled"
   case kEnableLatchedAlnumStateInMixedAlnumMode = "EnableLatchedAlnumStateInMixedAlnumMode"
+  case kSmartEnglishAutoSwitchEnabled = "SmartEnglishAutoSwitchEnabled"
+  case kSmartEnglishAutoSwitchIdleTimeoutMS = "SmartEnglishAutoSwitchIdleTimeoutMS"
   case kFuriousTypingEnabled = "FuriousTypingEnabled"
   case kCNS11643Enabled = "CNS11643Enabled"
   case kSymbolInputEnabled = "SymbolInputEnabled"
@@ -392,6 +394,7 @@ extension UserDef {
     case .kSpaceKeyBehaviorAgainstICB: 0 ... 2
     case .kCandidateListTextSize: 12 ... 196
     case .kPopupCompositionBufferTextSize: 18 ... 40
+    case .kSmartEnglishAutoSwitchIdleTimeoutMS: 100 ... 3_000
     default: nil
     }
   }
@@ -477,6 +480,8 @@ extension UserDef {
     case .kCassetteEnabled: return .bool(false)
     case .kMixedAlphanumericalEnabled: return .bool(false)
     case .kEnableLatchedAlnumStateInMixedAlnumMode: return .bool(false)
+    case .kSmartEnglishAutoSwitchEnabled: return .bool(true)
+    case .kSmartEnglishAutoSwitchIdleTimeoutMS: return .integer(500)
     case .kFuriousTypingEnabled: return .bool(true)
     case .kCNS11643Enabled: return .bool(false)
     case .kSymbolInputEnabled: return .bool(true)
@@ -772,6 +777,23 @@ extension UserDef {
         userDef: self,
         shortTitle: "i18n:UserDef.kEnableLatchedAlnumStateInMixedAlnumMode.shortTitle",
         description: "i18n:UserDef.kEnableLatchedAlnumStateInMixedAlnumMode.description"
+      )
+    case .kSmartEnglishAutoSwitchEnabled: return .init(
+        userDef: self,
+        shortTitle: "i18n:UserDef.kSmartEnglishAutoSwitchEnabled.shortTitle",
+        description: "i18n:UserDef.kSmartEnglishAutoSwitchEnabled.description"
+      )
+    case .kSmartEnglishAutoSwitchIdleTimeoutMS: return .init(
+        userDef: self,
+        shortTitle: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.shortTitle",
+        description: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.description",
+        options: [
+          300: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.300",
+          500: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.500",
+          800: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.800",
+          1_000: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1000",
+          1_500: "i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1500",
+        ]
       )
     case .kFuriousTypingEnabled: return .init(
         userDef: self, shortTitle: "i18n:UserDef.kFuriousTypingEnabled.shortTitle",

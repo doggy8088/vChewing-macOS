@@ -216,6 +216,11 @@ extension InputHandlerProtocol {
         return capsHandleResult
       }
 
+      // 智慧中英輸入自動切換：中文模式下偵測「其實是英文」的輸入，就地轉為英文輸出。
+      if let smartEnglishResult = handleSmartEnglishAutoSwitch(input: input) {
+        return smartEnglishResult
+      }
+
       // 處理九宮格數字鍵盤區域。
       if handleNumPadKeyInput(input: input) { return true }
 

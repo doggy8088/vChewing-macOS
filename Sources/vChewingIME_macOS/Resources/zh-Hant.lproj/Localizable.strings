@@ -440,6 +440,15 @@
 "i18n:UserDef.kMinCellWidthForHorizontalMatrix.shortTitle" = "橫向多列選字窗最低單元寬度:";
 "i18n:UserDef.kMixedAlphanumericalEnabled.description" = "該功能專為已適應某電腦廠牌輸入法打字體驗的使用者設計。該功能會優先將目前注音排列可覆蓋的 ASCII 按鍵暫時視為注音輸入；當整段序列不再構成可發音讀音時，再回退為原始 ASCII。若使用拼音輸入（也就是注音排列設為任一拼音排列）或磁帶模式，則該功能不可用。若已啟用該功能，您可能需要到辭典設定頁確認是否要篩除某些可能影響打字體驗的原廠辞典查詢結果。若有半形標點輸入需求，請開啟半形標點模式。";
 "i18n:UserDef.kMixedAlphanumericalEnabled.shortTitle" = "啟用中英混合輸入回退";
+"i18n:UserDef.kSmartEnglishAutoSwitchEnabled.shortTitle" = "智慧中英輸入自動切換";
+"i18n:UserDef.kSmartEnglishAutoSwitchEnabled.description" = "讓唯音在中文模式下自行辨識「其實是英文」的輸入：按 Tab 時把目前輸入的按鍵原樣轉為英文並送出 Tab；按空格時，若輸入順序不是合理的中文注音順序（例如 `cd`、`ls`），則轉為英文並補上一個空格。轉為英文後不離開唯音，持續輸入即持續輸出英文；閒置一段時間自動回到中文模式。僅支援注音鍵盤（不支援拼音、狂拼、磁帶與中英混打）。";
+"i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.shortTitle" = "智慧中英自動切換的閒置秒數:";
+"i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.description" = "英文輸出後閒置超過此時間即自動回到中文模式；連續按 BackSpace 的判定亦使用同一個時間。連續按 3 次 BackSpace 會取消英文輸出並還原先前的中文組字進度。";
+"i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.300" = "0.3 秒";
+"i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.500" = "0.5 秒";
+"i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.800" = "0.8 秒";
+"i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1000" = "1 秒";
+"i18n:UserDef.kSmartEnglishAutoSwitchIdleTimeoutMS.option.1500" = "1.5 秒";
 "i18n:UserDef.kNumPadCharInputBehavior.description" = "指定數字小鍵盤的輸入行為。";
 "i18n:UserDef.kNumPadCharInputBehavior.option.0" = "始終以半形文字直接遞交";
 "i18n:UserDef.kNumPadCharInputBehavior.option.1" = "始終以全形文字直接遞交";
