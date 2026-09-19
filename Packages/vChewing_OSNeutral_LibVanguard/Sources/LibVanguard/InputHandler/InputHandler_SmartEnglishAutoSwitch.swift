@@ -12,6 +12,8 @@ import Foundation
 /// 觸發條件（僅在 `.ofEmpty` / `.ofInputting` 狀態、注音鍵盤語境下生效）：
 /// - Tab：無條件把當前輸入鍵序列轉為英文並將 Tab 放行給客體（自動完成）。
 /// - Space：輸入鍵序列被判定為「不合理的中文輸入順序」時，轉為英文並附帶半形空格。
+/// - 路徑／URL 前綴：序列開頭兩鍵皆為 `.`,`/`,`~`,`\` 時（`./`、`../`、`~/`……）立即轉英。
+/// - 連續誤鍵：逐鍵累計的誤鍵數達門檻時立即轉英（不必等待 Space／Tab 斷點）。
 ///
 /// 進入「英數暫存模式」後不離開唯音：
 /// - 可列印 ASCII 一律原樣遞交（含大寫與空格）。
@@ -135,10 +137,36 @@ extension InputHandlerProtocol {
 
     recordSmartEnglishKeyTrailKey(input: input)
 
+    // 路徑／URL 前綴：序列開頭兩鍵皆為路徑特徵字元（`.`, `/`, `~`, `\`）時，明顯不是中文
+    // 輸入順序（例：`./`、`../`、`~/`、`//`），不必等待誤鍵門檻即整段轉英。
+    if isSmartEnglishObviousPathPrefix {
+      let trailJoined = smartEnglishContext.keyTrail.joined()
+      vCLog("SmartEnglish: path prefix trigger; trail=\(trailJoined)")
+      triggerSmartEnglishMode(appendingSpace: false)
+      return true
+    }
+
     // 連續誤鍵達門檻時自動轉英（適用於「所有輸入鍵都是合理按鍵、但輸入順序不合理」的情形）。
     if accountSmartEnglishTypingErrors() { return true }
 
     return nil
+  }
+
+  /// 路徑／URL 特徵字元：中文輸入幾乎不可能以這些字元連打作為序列開頭。
+  ///
+  /// 僅收 `.`（ㄡ）與 `/`（ㄥ）兩個鍵：前者是相對路徑的起手式，後者是絕對路徑與 URL 的標記。
+  /// 註：`~` 在唯音既有語義中是標點別名鍵（會就地併成 `～` 並自序列移除），故不列於此。
+  static var smartEnglishPathMarkerKeys: Set<String> { [".", "/"] }
+
+  /// 輸入鍵序列的開頭兩鍵是否皆為路徑特徵字元（`./`、`../`、`//` 等）。
+  ///
+  /// 判定只看序列**開頭**：這類前綴一旦出現即無疑是英文（相對路徑、URL 等），
+  /// 而注音語境下兩者互相覆寫（`.`,`/` ＝ ㄡ、ㄥ）也只會使先前的按鍵白打，故直接轉英並無損失。
+  /// 註：不採「結尾兩鍵」判定，因為那會誤傷正常中文（例如 `ㄓㄨㄥ` 之後改韻母）。
+  var isSmartEnglishObviousPathPrefix: Bool {
+    let trail = smartEnglishContext.keyTrail
+    guard trail.count >= 2 else { return false }
+    return trail.prefix(2).allSatisfy(Self.smartEnglishPathMarkerKeys.contains)
   }
 
   /// 逐鍵累計「連續誤鍵」次數；達門檻時直接轉為英文輸出。

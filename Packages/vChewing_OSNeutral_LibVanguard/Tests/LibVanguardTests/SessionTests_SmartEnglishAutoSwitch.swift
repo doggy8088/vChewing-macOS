@@ -75,4 +75,18 @@ extension LibVanguardTestsRoot.InputHandlerTests.Session {
     #expect(testSession.state.displayedText.contains("，"))
     #expect(!testSession.state.displayedText.contains("<"))
   }
+
+  @Test
+  func test_SESR05_RealSessionPathPrefixConvertsWithoutBreakKey() throws {
+    resetToAbortionAndClear()
+    // 使用者實機情境：只打 `./`（兩鍵）即應轉英，不必等誤鍵門檻或空格／Tab。
+    [".", "/"].forEach { press(KBEvent.KeyEventData(chars: $0)) }
+    diagSmartEnglish("after ./")
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testClientProxy.committedText == "./")
+    // 續打 `build` 一路為英文。
+    ["b", "u", "i", "l", "d"].forEach { press(KBEvent.KeyEventData(chars: $0)) }
+    diagSmartEnglish("after ./build")
+    #expect(testClientProxy.committedText == "./build")
+  }
 }
