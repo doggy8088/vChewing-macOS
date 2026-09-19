@@ -62,6 +62,10 @@ extension SettingsPanesCocoa {
             fixWidth: contentWidth,
             prefUITab: .tabDevZone
           )
+          UserDef.kRecordTypingHistory.renderCocoa(
+            fixWidth: contentWidth,
+            prefUITab: .tabDevZone
+          )
         }?.boxed()
         NSStackView.build(.horizontal, insets: .new(all: 0, left: 16, right: 16)) {
           "i18n:Settings.OptionsMovedToOtherTabs"

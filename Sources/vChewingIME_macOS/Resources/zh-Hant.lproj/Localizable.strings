@@ -482,6 +482,8 @@
 "i18n:UserDef.kReadingNarrationCoverage.option.1" = "僅在用聲調鍵確認時";
 "i18n:UserDef.kReadingNarrationCoverage.option.2" = "實時唸讀組音區的任何變化";
 "i18n:UserDef.kReadingNarrationCoverage.shortTitle" = "要唸讀的組音區內容";
+"i18n:UserDef.kRecordTypingHistory.description" = "啟用後，每次遞交的中文組字結果都會以 JSON Lines 追加寫入 vChewing 的 Application Support 目錄下的「vChewing_typing-history.jsonl」，內容含時間戳、輸入模式、讀音與遞交文字，供離線詞頻與選字策略分析。該檔案只留在本機、不會上傳。";
+"i18n:UserDef.kRecordTypingHistory.shortTitle" = "記錄打字履歷供離線分析";
 "i18n:UserDef.kReducePOMLifetimeToNoMoreThan12Hours.description" = "啟用後，漸退記憶模組的遺忘週期將從約一週降低至 12 小時內，更快地清除不常用的記憶記錄。";
 "i18n:UserDef.kReducePOMLifetimeToNoMoreThan12Hours.shortTitle" = "啟用急速遺忘模式";
 "i18n:UserDef.kReflectBPMFVSInCompositionBuffer.description" = "僅在 Command+Option+Ctrl+Enter 被設為遞交 ButKo BPMFVS 注音標記時生效。啟用後，組字區與候選預覽也會直接顯示 ButKo BPMFVS 投影結果，讓畫面字形盡量與特殊遞交結果一致。";

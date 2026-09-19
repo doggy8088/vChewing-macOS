@@ -482,6 +482,8 @@
 "i18n:UserDef.kReadingNarrationCoverage.option.1" = "Only when combined by intonation";
 "i18n:UserDef.kReadingNarrationCoverage.option.2" = "All changes in reading composer";
 "i18n:UserDef.kReadingNarrationCoverage.shortTitle" = "Reading composer contents to narrate";
+"i18n:UserDef.kRecordTypingHistory.description" = "When enabled, every Chinese composition you commit is appended as one JSON line (timestamp, input mode, reading, and committed text) to vChewing_typing-history.jsonl in vChewing's Application Support folder, for offline word-frequency and candidate-selection analysis. The file stays on this Mac and is never uploaded.";
+"i18n:UserDef.kRecordTypingHistory.shortTitle" = "Record typing history for offline analysis";
 "i18n:UserDef.kReducePOMLifetimeToNoMoreThan12Hours.description" = "When enabled, the perception override model's forgetting cycle will be reduced from approximately one week to within 12 hours, clearing infrequently used memory records more quickly.";
 "i18n:UserDef.kReducePOMLifetimeToNoMoreThan12Hours.shortTitle" = "Enable rapid forgetting mode";
 "i18n:UserDef.kReflectBPMFVSInCompositionBuffer.description" = "Only takes effect when Command+Option+Ctrl+Enter is set to commit ButKo BPMFVS annotation. When enabled, the composition buffer and candidate preview show the projected ButKo BPMFVS form so the visible glyphs stay aligned with the special-commit result.";

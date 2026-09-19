@@ -158,6 +158,9 @@ public final class PrefMgr: PrefMgrProtocol, Sendable {
   @AppProperty(userDef: .kReducePOMLifetimeToNoMoreThan12Hours)
   public var reducePOMLifetimeToNoMoreThan12Hours: Bool
 
+  @AppProperty(userDef: .kRecordTypingHistory)
+  public var recordTypingHistory: Bool
+
   @AppProperty(userDef: .kUseFixedCandidateOrderOnSelection)
   public var useFixedCandidateOrderOnSelection: Bool
 

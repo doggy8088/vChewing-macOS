@@ -482,6 +482,8 @@
 "i18n:UserDef.kReadingNarrationCoverage.option.1" = "音調キーで確認するときに";
 "i18n:UserDef.kReadingNarrationCoverage.option.2" = "いずれの変化が起きたときに";
 "i18n:UserDef.kReadingNarrationCoverage.shortTitle" = "音読組立の朗読";
+"i18n:UserDef.kRecordTypingHistory.description" = "有効にすると、確定した中国語入力のたびに、タイムスタンプ・入力モード・読み・確定文字を含む 1 行の JSON を vChewing の Application Support フォルダ内の「vChewing_typing-history.jsonl」に追記します（語頻度や候補選択のオフライン分析用）。データは本機に留まり、外部へ送信されません。";
+"i18n:UserDef.kRecordTypingHistory.shortTitle" = "オフライン分析用に入力履歴を記録する";
 "i18n:UserDef.kReducePOMLifetimeToNoMoreThan12Hours.description" = "有効にすると、臨時記憶モジュールの忘却サイクルが約1週間から12時間以内に短縮され、使用頻度の低いメモリレコードがより迅速にクリアされます。";
 "i18n:UserDef.kReducePOMLifetimeToNoMoreThan12Hours.shortTitle" = "急速忘却モードを有効にする";
 "i18n:UserDef.kReflectBPMFVSInCompositionBuffer.description" = "Command+Option+Ctrl+Enter が ButKo BPMFVS 注音表記送出に設定されている場合にのみ有効です。有効にすると、入力緩衝列と候補プレビューも ButKo BPMFVS 投影結果で表示され、画面上の字形を特殊送出結果とできるだけ一致させます。";
