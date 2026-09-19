@@ -347,34 +347,35 @@ extension InputHandlerProtocol {
     return result
   }
 
-  /// 記錄「剛被併入組字器的標點其實出自輸入鍵序列」，並將該按鍵自輸入鍵序列移除。
+  /// 記錄「剛被併入組字器的內容其實出自輸入鍵序列」，並將該按鍵自輸入鍵序列移除。
   ///
-  /// 標點輸入是正常的中文輸入、不是誤鍵：該按鍵的輸出既已由中文端（組字器）承擔，
-  /// 就不該再計為誤鍵、也不該重複出現在英文輸出中。實機案例：以 `<` 鍵輸入「，」後
-  /// 續打「終於」時，`<` 被視為無效鍵而累計誤鍵，導致按空白鍵（一聲）即誤轉英文。
+  /// 凡該鍵的輸出已由組字器承擔（標點併入、或 Shift+字母以 `_letter_` 形式塞進組字區），
+  /// 該鍵就不該再留在序列中——否則它既會被當成無效注音鍵而計為誤鍵，又會在轉英時重複輸出。
+  /// 實機案例：Shift 鍵入 `API` 得到 `APAPI`（前綴已有 `AP`、序列又湊上 `API`）。
   /// - Parameters:
-  ///   - insertedKey: 併入組字器的鍵名（例如 `_punctuation_Standard_<`）。
-  ///   - displayedPunctuation: 該標點在組字區的顯示字元（例如全形 `，`）。
-  func noteSmartEnglishTrailOwnedPunctuation(insertedKey: String, displayedPunctuation: String?) {
+  ///   - insertedKey: 併入組字器的鍵名（例如 `_punctuation_Standard_<`、`_letter_A`）。
+  ///   - displayedCharacter: 該鍵在組字區的顯示字元（例如全形 `，`、半形 `A`）。
+  func noteSmartEnglishTrailOwnedInsertion(insertedKey: String, displayedCharacter: String?) {
     guard isSmartEnglishAutoSwitchApplicable else { return }
-    guard let displayedPunctuation, !displayedPunctuation.isEmpty else { return }
     guard !smartEnglishContext.keyTrail.isEmpty else { return }
-    smartEnglishContext.trailOwnedPunctuations.append(displayedPunctuation)
-    // `_letter_` 開頭者為 Shift+字母的字母插入（其輸出屬「中英混打」語義），不在此列。
-    guard !insertedKey.hasPrefix("_letter_") else { return }
+    // 標點另記「序列自產標點」，供轉英時改寫為半形（見 PRD §5.1.B）；字母無全形／半形之分，不記。
+    if !insertedKey.hasPrefix("_letter_"),
+       let displayedCharacter, !displayedCharacter.isEmpty {
+      smartEnglishContext.trailOwnedPunctuations.append(displayedCharacter)
+    }
     guard let lastKey = smartEnglishContext.keyTrail.last,
           insertedKey.hasSuffix(lastKey) else { return }
     let violationsBefore = analyzeSmartEnglishKeyTrail().violationCount
     smartEnglishContext.keyTrail.removeLast()
     let violationsAfter = analyzeSmartEnglishKeyTrail().violationCount
-    // 該按鍵先前若曾貢獻誤鍵，一併自連續誤鍵計次中扣除（標點不是誤鍵）。
+    // 該按鍵先前若曾貢獻誤鍵，一併自連續誤鍵計次中扣除（其輸出已由組字器承擔）。
     let removedViolations = Swift.max(0, violationsBefore - violationsAfter)
     smartEnglishContext.consecutiveTypingErrorCount = Swift.max(
       0, smartEnglishContext.consecutiveTypingErrorCount - removedViolations
     )
     smartEnglishContext.analyzedViolationCount = violationsAfter
     vCLog(
-      "SmartEnglish: punctuation \(displayedPunctuation) owned by trail; key \(insertedKey) removed."
+      "SmartEnglish: \(insertedKey) owned by trail; key \(lastKey) removed from trail."
     )
   }
 

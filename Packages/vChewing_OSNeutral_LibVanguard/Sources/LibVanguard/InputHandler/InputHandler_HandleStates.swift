@@ -833,9 +833,9 @@ extension InputHandlerProtocol {
 
     // 智慧中英自動切換：這個標點是在輸入鍵序列非空時敲進來的（例如 `https://` 的 `:`、
     // 以 `<` 鍵輸入的「，」），記下此事並自序列移除該鍵——標點是正常輸入、不是誤鍵。
-    noteSmartEnglishTrailOwnedPunctuation(
+    noteSmartEnglishTrailOwnedInsertion(
       insertedKey: customPunctuation,
-      displayedPunctuation: committableDisplayText(sansReading: true).last.map(String.init)
+      displayedCharacter: committableDisplayText(sansReading: true).last.map(String.init)
     )
 
     // 從這一行之後開始，就是針對逐字選字模式的單獨處理。

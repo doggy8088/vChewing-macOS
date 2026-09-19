@@ -781,6 +781,30 @@ extension LibVanguardTestsRoot.InputHandlerTests {
   }
 
   @Test
+  func test_SES053_ShiftLettersAreNotDuplicatedByTranslationTrigger() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 實機案例：Shift 鍵入 `API` 得到 `APAPI`（前綴已有 `AP`、序列又湊上 `API`）。
+    // 根因：Shift+字母（`upperCaseLetterKeyBehavior == 0`）以 `_letter_X` 塞進組字區，
+    // 其輸出既已在中文前綴中，該鍵就不該再留在輸入鍵序列中（否則既計誤鍵、又重複輸出）。
+    let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
+    defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
+    testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
+    ["A", "P", "I"].forEach { _ = triageKey($0, flags: [.shift]) }
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(testHandler.smartEnglishKeyTrail.isEmpty, "trail=\(testHandler.smartEnglishKeyTrail)")
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 0)
+    #expect(testHandler.committableDisplayText(sansReading: true) == "API")
+    #expect(
+      !testSession.recentCommissions.contains { $0.contains("AP") },
+      "commissions=\(testSession.recentCommissions)"
+    )
+  }
+
+  @Test
   func test_SES049_TrailRecordsNoPunctuationKeysAtAll() throws {
     resetSmartEnglishTestState()
     guard let testHandler else {
