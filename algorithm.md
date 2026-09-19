@@ -186,6 +186,13 @@ LexiconAssembly 對多個子語言模型進行匯整、去重、替換與增益�
 - POM（漸退記憶）亦以「Homa n-gram 統計來源」直接參與組句：`unigramsFor` 的注入路徑於 `kFetchSuggestionsFromPerceptionOverrideModel`（預設啟用）開啟時以 `perceptionsFor(headReading:)` 撈取記憶，僅將帶上下文（previous／anterior）者附加為 bigram／trigram gram（bare unigram 記憶不進引擎、由 LibVanguard 建議通道浮現）。讀音比對預設 `.exact`：查詢段帶聲調（具體讀音）時須與記憶逐字等值——避免「打『有』出『右』」類跨聲調錯位注入；查詢段不帶聲調（狂拼聲調桶代表鍵／前綴 partial）維持去聲調等值容錯。`.toneInsensitivePrefix` 則為全局去聲調等值、供狂拼建議查詢。另設注音錯位守衛：注音讀音記憶若「候選字數 ≠ head 讀音段數」（錯位髒資料，如「體式」誤記於單鍵 ㄕˊ 之下）一律不套用／不餵入。LibVanguard 的建議套用入口同樣受 `kFetchSuggestionsFromPerceptionOverrideModel` 把守。
 - 單音節與多音節的相對優先可藉由分數基準或「POM 所帶來的微幅增益」維持體感合理性，又避免壓制更長詞彙的組句。
 
+### 打字履歷（離線詞頻分析）
+
+- `kRecordTypingHistory`（預設關閉；設定位於「開發者專區」）開啟後，`SessionProtocol.commit(text:clearDisplayBeforeCommit:)` 會把每次「帶讀音」的遞交（即中文模式的組字結果）追加寫入一行 JSON：`{"ts":時間戳,"mode":"chs|cht","reading":"ㄘㄜˋ-ㄕˋ","text":"測試"}`。
+- 檔案為 `vChewing_typing-history.jsonl`，與漸退記憶模組資料同放在預設使用者資料目錄之下（Darwin 端由 `SessionHost.typingHistoryDataURL` 注入路徑；LibVanguard 端為 `TypingHistoryLogger`），供離線詞頻與選字策略分析。
+- 讀音欄位取自當前組字結果各節點（`assembler.assembledSentence`）的 keyArray 並以「-」相連；英數模式、標點符號服務、遞交空白鍵等不帶讀音者一律不記。寫入失敗只留 log、不干擾打字流程。
+- 與 POM 的差異：POM 只記「顯式覆寫某候選」且帶前後文語境的衰減統計；本記錄涵蓋每一次遞交、不帶語境亦不衰減，兩者可互補。
+
 ### 關聯詞語與符號輸出
 
 - 在特定條件（如結尾為標點、或 UI 提示）下，lxAssociates 會給出與當前輸出語境相關的下一步候選（含標點）。
