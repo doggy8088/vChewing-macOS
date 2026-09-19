@@ -377,18 +377,18 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       Issue.record("Test handler or session is nil.")
       return
     }
-    // 相對路徑情境：`./con` ＋ Tab（`.` 與 `/` 亦必須計入輸入鍵序列）。
+    // 相對路徑情境：`./con` ＋ Tab。`./` 兩鍵即已自動轉英（見 SES050），
+    // 故 Tab 此時只負責放行給客體（自動完成），輸出仍為 `./con`。
     ["."].forEach { _ = triageKey($0) }
     _ = triageKey("/")
     ["c", "o", "n"].forEach { _ = triageKey($0) }
-    #expect(testHandler.smartEnglishKeyTrail == [".", "/", "c", "o", "n"])
     let consumed = triageKey(
       KBEvent.SpecialKey.tab.unicodeScalar.description,
       keyCode: KeyCode.kTab.rawValue
     )
     #expect(!consumed)
     #expect(testHandler.isSmartEnglishModeActive)
-    #expect(testSession.recentCommissions.contains("./con"))
+    #expect(testSession.recentCommissions.joined() == "./con")
   }
 
   @Test
@@ -417,7 +417,7 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       Issue.record("Test handler or session is nil.")
       return
     }
-    // 上一層相對路徑情境：`../pro` ＋ Tab。
+    // 上一層相對路徑情境：`../pro` ＋ Tab（`..` 兩鍵即已自動轉英）。
     ["."].forEach { _ = triageKey($0) }
     _ = triageKey(".")
     _ = triageKey("/")
@@ -428,7 +428,7 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     )
     #expect(!consumed)
     #expect(testHandler.isSmartEnglishModeActive)
-    #expect(testSession.recentCommissions.contains("../pro"))
+    #expect(testSession.recentCommissions.joined() == "../pro")
   }
 
   @Test
@@ -460,13 +460,13 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       Issue.record("Test handler or session is nil.")
       return
     }
-    // 路徑後接空格（`./con `）亦屬不合理的注音順序，比照 `cd ` 轉為英文。
+    // 路徑後接空格（`./con `）：`./` 兩鍵即轉英，之後的空格屬英數暫存模式的內容。
     _ = triageKey(".")
     _ = triageKey("/")
     ["c", "o", "n"].forEach { _ = triageKey($0) }
     #expect(triageKey(" "))
     #expect(testHandler.isSmartEnglishModeActive)
-    #expect(testSession.recentCommissions.last == "./con ")
+    #expect(testSession.recentCommissions.joined() == "./con ")
   }
 
   @Test
@@ -616,11 +616,12 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     let single = SmartEnglishTrailAnalyzer.analyze(keyTrail: [":", "/"], parser: .ofDachen)
     let doubled = SmartEnglishTrailAnalyzer.analyze(keyTrail: [":", "/", "/"], parser: .ofDachen)
     #expect(doubled.violationCount == single.violationCount + 1)
-    // 實機（handler）流程亦同：連按第二個 `/` 使計次增加一次。
-    _ = triageKey(":")
-    _ = triageKey("/")
+    // 實機（handler）流程亦同：連按第二個相同的韻母鍵使計次增加一次。
+    // （此處用 `l` ＝ ㄠ，避免與 §5.1.C 的路徑前綴規則（`//`）互相干涉。）
+    _ = triageKey("c")
+    _ = triageKey("l")
     let errorsBeforeRepeat = testHandler.smartEnglishConsecutiveTypingErrors
-    _ = triageKey("/")
+    _ = triageKey("l")
     #expect(testHandler.smartEnglishConsecutiveTypingErrors == errorsBeforeRepeat + 1)
   }
 
@@ -652,13 +653,14 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       return
     }
     // 中文模式下 `:` 會被轉成全形 `：` 併入組字器；轉英時必須只輸出半形的原按鍵序列。
+    // （`//` 兩鍵即觸發 §5.1.C 的路徑前綴規則；不論走哪條觸發路徑，輸出皆須為半形的 `:`。）
     _ = triageKey(":")
     _ = triageKey("/")
     #expect(testHandler.committableDisplayText(sansReading: true).contains("："))
     _ = triageKey("/")
     #expect(triageKey(" "))
     #expect(testHandler.isSmartEnglishModeActive)
-    #expect(testSession.recentCommissions.last == ":// ")
+    #expect(testSession.recentCommissions.joined() == ":// ")
   }
 
   @Test
@@ -716,6 +718,66 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       !testSession.recentCommissions.contains { $0.contains("<") },
       "commissions=\(testSession.recentCommissions)"
     )
+  }
+
+  // MARK: - 路徑／URL 前綴（不需斷點鍵即轉英）
+
+  @Test
+  func test_SES050_PathPrefixConvertsWithoutBreakKey() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // `./` 只有兩鍵：注音讀作 `.` ＝ ㄡ、`/` ＝ ㄥ（後者覆寫前者，先前的鍵白打），
+    // 明顯不是中文輸入順序，故不等誤鍵門檻（預設 5）即整段轉英。
+    #expect(testHandler.smartEnglishErrorThreshold == 5)
+    _ = triageKey(".")
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(triageKey("/"))
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == "./")
+    // 之後的字元一律走英數暫存模式。
+    _ = triageKey("b")
+    #expect(testSession.recentCommissions.last == "b")
+  }
+
+  @Test
+  func test_SES051_OtherPathPrefixesConvertImmediately() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // `..`（相對路徑的上一層）與 `//` 同樣只有兩鍵即轉英。
+    for keys in [[".", "."], ["/", "/"]] {
+      resetSmartEnglishTestState()
+      keys.forEach { _ = triageKey($0) }
+      #expect(testHandler.isSmartEnglishModeActive, "keys=\(keys)")
+      #expect(
+        testSession.recentCommissions.contains(keys.joined()),
+        "keys=\(keys) commissions=\(testSession.recentCommissions)"
+      )
+    }
+  }
+
+  @Test
+  func test_SES052_PlausibleChineseIsNotHijackedByPathPrefixRule() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // `c l k` ＝ ㄏㄠ → ㄏㄜ（改韻母的中文修正行為）：不得因此轉英。
+    ["c", "l", "k"].forEach { _ = triageKey($0) }
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(testHandler.smartEnglishConsecutiveTypingErrors == 0)
+    // `.` 之後接聲調鍵（`. 3` ＝ 偶）：屬正常中文輸入，不得轉英。
+    resetSmartEnglishTestState()
+    _ = triageKey(".")
+    _ = triageKey("3")
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(!testSession.recentCommissions.contains("./"))
   }
 
   @Test
