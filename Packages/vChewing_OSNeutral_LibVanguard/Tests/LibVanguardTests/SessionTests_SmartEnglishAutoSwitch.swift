@@ -89,4 +89,20 @@ extension LibVanguardTestsRoot.InputHandlerTests.Session {
     diagSmartEnglish("after ./build")
     #expect(testClientProxy.committedText == "./build")
   }
+
+  @Test
+  func test_SESR06_RealSessionShiftLettersAreNotDuplicated() throws {
+    resetToAbortionAndClear()
+    // 使用者實機情境：Shift 鍵入 `API`（其門檻 3）—— 客體必須收到 `API`，不得為 `APAPI`。
+    let originalValue = testHandler.prefs.smartEnglishAutoSwitchErrorThreshold
+    defer { testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = originalValue }
+    testHandler.prefs.smartEnglishAutoSwitchErrorThreshold = 3
+    ["A", "P", "I"].forEach { press(KBEvent.KeyEventData(flags: [.shift], chars: $0)) }
+    diagSmartEnglish("after API")
+    #expect(!testHandler.isSmartEnglishModeActive)
+    press(KBEvent.KeyEventData.dataEnterReturn)
+    diagSmartEnglish("after API + enter")
+    #expect(testClientProxy.committedText == "API")
+    #expect(!testClientProxy.committedText.contains("APAPI"))
+  }
 }
