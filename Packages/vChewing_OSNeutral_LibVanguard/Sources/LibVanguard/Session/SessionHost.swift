@@ -120,6 +120,8 @@ public final class SessionHost {
 
   /// 取得指定模式下的感知模型（POM）資料路徑。
   public var pomDataURL: (Shared.InputMode) -> URL? = { _ in nil }
+  /// 取得「打字履歷」（JSONL）的檔案路徑；未設定時不記錄。
+  public var typingHistoryDataURL: () -> URL? = { nil }
   /// 候選字鍵驗證。
   public var validateCandidateKeys: (_ prefs: any PrefMgrProtocol, _ keys: String) -> String? =
     { _, _ in nil }

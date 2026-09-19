@@ -86,6 +86,17 @@ extension LXMgr {
       .appendingPathComponent(fileName)
   }
 
+  /// 「打字履歷」（JSON Lines）檔案路徑。
+  ///
+  /// 該檔案的寫入頻次與成長速度都偏高，且內容僅供離線詞頻／選字分析，
+  /// 故與漸退記憶模組資料同放在預設使用者資料目錄（不受自訂片語辭典目錄的更動影響）。
+  /// - Returns: 資料路徑（URL）。
+  public static func typingHistoryDataURL() -> URL {
+    URL(fileURLWithPath: dataFolderPath(isDefaultFolder: true))
+      .deletingLastPathComponent()
+      .appendingPathComponent("vChewing_typing-history.jsonl")
+  }
+
   /// 使用者漸退記憶模組資料的存取頻次特別高，且資料新陳代謝速度快，所以只適合放在預設的使用者資料目錄下。
   /// 也就是「~/Library/Application Support/vChewing/」目錄下，且不會隨著使用者片語辭典目錄的改變而改變。
   /// - Parameter mode: 簡繁體輸入模式。

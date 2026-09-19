@@ -103,6 +103,8 @@ extension SessionProtocol {
       buffer = SessionHost.shared.kanjiConversionIfRequired(queried)
     }
 
+    recordTypingHistoryIfNeeded(committedText: buffer)
+
     func doCommit(_ theBuffer: String) {
       if let ctl = clientProxy {
         ctl.clientTextInsertion(with: theBuffer, replacementRange: replacementRange())
@@ -112,6 +114,31 @@ extension SessionProtocol {
     asyncOnMain(bypassAsync: !isServingIMEItself || UserDefaults.pendingUnitTests) {
       doCommit(buffer)
     }
+  }
+
+  /// 在「記錄打字履歷」偏好開啟時，將本次遞交的組字結果追加至 JSONL 檔。
+  ///
+  /// 只記錄「帶讀音」的遞交（即中文模式的組字結果）：英數模式、標點符號服務、
+  /// 純空格遞交等沒有組字節點者一律略過，以免在履歷內摻入雜訊。
+  private func recordTypingHistoryIfNeeded(committedText: String) {
+    guard prefs.recordTypingHistory, !committedText.isEmpty else { return }
+    let reading = typingHistoryReadingForCurrentAssembly()
+    guard !reading.isEmpty else { return }
+    TypingHistoryLogger.shared.record(
+      mode: inputMode,
+      reading: reading,
+      text: committedText,
+      to: SessionHost.shared.typingHistoryDataURL()
+    )
+  }
+
+  /// 本次遞交內容對應的讀音：以當前組字結果各節點的讀音、以「-」相連。
+  private func typingHistoryReadingForCurrentAssembly() -> String {
+    guard let inputHandler else { return "" }
+    return inputHandler.assembler.assembledSentence
+      .map(\.keyArray)
+      .flatMap { $0 }
+      .joined(separator: "-")
   }
 
   /// IMK 有如下限制：

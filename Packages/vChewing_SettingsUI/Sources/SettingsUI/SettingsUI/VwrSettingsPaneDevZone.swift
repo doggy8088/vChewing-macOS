@@ -32,6 +32,7 @@
           UserDef.kCheckAbusersOfSecureEventInputAPI.renderUI()
           UserDef.kUserPhrasesDatabaseBypassed.renderUI()
           UserDef.kAllowRescoringSingleKanjiCandidates.renderUI()
+          UserDef.kRecordTypingHistory.renderUI()
         } footer: {
           Text("i18n:Settings.OptionsMovedToOtherTabs".i18n)
             .settingsDescription()
