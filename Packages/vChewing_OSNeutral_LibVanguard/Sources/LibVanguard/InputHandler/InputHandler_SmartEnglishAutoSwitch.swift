@@ -48,13 +48,13 @@ extension InputHandlerProtocol {
 
   /// 智慧中英自動切換是否適用於當前語境。
   ///
-  /// MVP 僅涵蓋注音鍵盤（`vChewingFactory` ＋ 非拼音、非磁帶、非中英混打、非英數模式）。
-  /// 拼音鍵盤與狂拼另有自身機制，磁帶與中英混打亦不在本功能語義內。
+  /// MVP 僅涵蓋注音鍵盤（`vChewingFactory` ＋ 非拼音、非狂打、非磁帶、非中英混打、非英數模式）。
+  /// 拼音鍵盤與狂打另有自身機制，磁帶與中英混打亦不在本功能語義內。
   public var isSmartEnglishAutoSwitchApplicable: Bool {
     guard prefs.smartEnglishAutoSwitchEnabled, let session else { return false }
     guard currentTypingMethod == .vChewingFactory else { return false }
     guard !prefs.mixedAlphanumericalEnabled, !prefs.cassetteEnabled else { return false }
-    guard !isPinyinFamilyTypingMode else { return false }
+    guard !isPinyinFamilyTypingMode, !isFuriousTypingModeEffective else { return false }
     guard !session.isASCIIMode else { return false }
     return true
   }

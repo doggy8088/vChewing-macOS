@@ -278,6 +278,42 @@ extension LibVanguardTestsRoot.InputHandlerTests {
   }
 
   @Test
+  func test_SES054_ZhuyinFuriousKeepsItsOwnTypingPipeline() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    let saved = (
+      pinyin: testHandler.prefs.furiousTypingEnabled4Pinyin,
+      zhuyin: testHandler.prefs.furiousTypingEnabled4Zhuyin
+    )
+    defer {
+      testHandler.prefs.furiousTypingEnabled4Pinyin = saved.pinyin
+      testHandler.prefs.furiousTypingEnabled4Zhuyin = saved.zhuyin
+      testSession.resetInputHandler(forceComposerCleanup: true)
+    }
+    testHandler.prefs.furiousTypingEnabled4Pinyin = true
+    testHandler.prefs.furiousTypingEnabled4Zhuyin = true
+    #expect(testHandler.typingMode == .zhuyinFuriousTyping)
+
+    triageKey(".")
+    triageKey("/")
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(testHandler.smartEnglishKeyTrail.isEmpty)
+    #expect(!testSession.recentCommissions.contains("./"))
+
+    // 關閉注音狂打後恢復智慧轉英；拼音狂打開關不影響注音鍵盤。
+    testHandler.prefs.furiousTypingEnabled4Zhuyin = false
+    testSession.resetInputHandler(forceComposerCleanup: true)
+    resetSmartEnglishTestState()
+    triageKey(".")
+    triageKey("/")
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == "./")
+  }
+
+  @Test
   func test_SES014_PunctuationOnlyTrailIsNotConverted() throws {
     resetSmartEnglishTestState()
     guard let testHandler, let testSession else {
