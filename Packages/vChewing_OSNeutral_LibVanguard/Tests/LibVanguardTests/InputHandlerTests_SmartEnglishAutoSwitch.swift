@@ -932,4 +932,105 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("話，", trail: ["w", "w"]) == "話，")
     #expect(testHandler.sanitizedChinesePrefixForSmartEnglish("：", trail: ["c", "d"]) == "：")
   }
+
+  // MARK: - 內建英文單字（不需斷點鍵即轉英）
+
+  @Test
+  func test_SES055_BuiltInWordsConvertOnTheirLastKey() throws {
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    for word in ["vpn", "zoo", "cal", "note", "tea"] {
+      resetSmartEnglishTestState()
+      let keys = word.map(\.description)
+      // 最後一鍵之前不得轉英——除非較短的前綴本身也在清單內（`note` 會在 `not` 先觸發）。
+      let hasListedPrefix = (3 ..< keys.count).contains {
+        SmartEnglishBuiltInWords.all.contains(keys.prefix($0).joined())
+      }
+      keys.dropLast().forEach { _ = triageKey($0) }
+      #expect(testHandler.isSmartEnglishModeActive == hasListedPrefix, "word=\(word)")
+      // 最後一鍵：本拍按鍵被消費、客體收到的內容恰為該單字（不附空格）、處於英數暫存模式。
+      #expect(triageKey(keys.last ?? ""), "word=\(word)")
+      #expect(testHandler.isSmartEnglishModeActive, "word=\(word)")
+      #expect(testSession.recentCommissions.joined() == word, "commissions=\(testSession.recentCommissions)")
+      #expect(testHandler.composer.isEmpty, "word=\(word)")
+    }
+    // 之後的字元一律走英數暫存模式（`note` → `notebook`）。
+    resetSmartEnglishTestState()
+    ["n", "o", "t", "e", "b", "o", "o", "k"].forEach { _ = triageKey($0) }
+    #expect(testSession.recentCommissions.joined() == "notebook")
+  }
+
+  @Test
+  func test_SES056_BuiltInWordCommitsPendingChineseFirst() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // `su3` ＝ ㄋㄧˇ 成文後序列失效（於下一鍵對帳時清空），接著打的 `tea` 自成一段序列。
+    ["s", "u", "3"].forEach { _ = triageKey($0) }
+    let chinesePrefix = testHandler.committableDisplayText(sansReading: true)
+    #expect(!chinesePrefix.isEmpty)
+    ["t", "e", "a"].forEach { _ = triageKey($0) }
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == chinesePrefix + "tea")
+  }
+
+  @Test
+  func test_SES057_BuiltInWordMustBeTheWholeTrail() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // 單字只出現在序列尾端（`xtea`）：不觸發單字規則（誤鍵數仍低於預設門檻 5）。
+    #expect(testHandler.smartEnglishErrorThreshold == 5)
+    ["x", "t", "e", "a"].forEach { _ = triageKey($0) }
+    #expect(!testHandler.isSmartEnglishModeActive, "trail=\(testHandler.smartEnglishKeyTrail)")
+    // 清單外的字（`cat`）不觸發。
+    resetSmartEnglishTestState()
+    ["c", "a", "t"].forEach { _ = triageKey($0) }
+    #expect(!testHandler.isSmartEnglishModeActive, "trail=\(testHandler.smartEnglishKeyTrail)")
+  }
+
+  @Test
+  func test_SES058_BuiltInWordsStayClearOfZhuyinOrder() throws {
+    let parser = Tekkon.MandarinParser.ofDachen
+    // 使用者指定、但違規僅 1 次（近似合理注音）的例外：`vpn` ＝ ㄒㄣ→ㄙ、`zoo` ＝ ㄈㄟㄟ、`cal` ＝ ㄏ→ㄇㄠ。
+    let userSpecifiedExceptions: Set<String> = ["vpn", "zoo", "cal"]
+    let words = SmartEnglishBuiltInWords.all
+    #expect(words.count == 559)
+    for word in words {
+      #expect(word.count >= 3, "word=\(word)")
+      #expect(word.allSatisfy { ("a" ... "z").contains($0) }, "word=\(word)")
+      guard !userSpecifiedExceptions.contains(word) else { continue }
+      // 違規 0–1 次＝按鍵順序即為或近似合理注音，收進清單會攔截正常中文。
+      let keys = word.map(\.description)
+      let violations = SmartEnglishTrailAnalyzer.analyze(keyTrail: keys, parser: parser).violationCount
+      #expect(violations >= 2, "word=\(word) violations=\(violations)")
+    }
+    // 已知與注音輸入順序高度重疊者不得收錄。
+    for word in ["top", "jul", "oil", "all", "will", "who", "job"] {
+      #expect(!words.contains(word), "word=\(word)")
+    }
+  }
+
+  @Test
+  func test_SES059_CommonWordConvertsOnItsLastKey() throws {
+    resetSmartEnglishTestState()
+    guard let testHandler, let testSession else {
+      Issue.record("Test handler or session is nil.")
+      return
+    }
+    // `the` ＝ ㄔ→ㄘ→ㄍ（違規 2 次、預設門檻 5 不會自動轉）：打完 `e` 即轉英。
+    #expect(testHandler.smartEnglishErrorThreshold == 5)
+    _ = triageKey("t")
+    _ = triageKey("h")
+    #expect(!testHandler.isSmartEnglishModeActive)
+    #expect(triageKey("e"))
+    #expect(testHandler.isSmartEnglishModeActive)
+    #expect(testSession.recentCommissions.last == "the")
+  }
 }

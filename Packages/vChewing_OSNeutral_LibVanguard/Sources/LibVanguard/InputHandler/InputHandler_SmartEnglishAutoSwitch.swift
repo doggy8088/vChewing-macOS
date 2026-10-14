@@ -13,6 +13,7 @@ import Foundation
 /// - Tab：無條件把當前輸入鍵序列轉為英文並將 Tab 放行給客體（自動完成）。
 /// - Space：輸入鍵序列被判定為「不合理的中文輸入順序」時，轉為英文並附帶半形空格。
 /// - 路徑／URL 前綴：序列開頭兩鍵皆為 `.`,`/`,`~`,`\` 時（`./`、`../`、`~/`……）立即轉英。
+/// - 內建英文單字：序列恰好拼成內建清單中的常用英文單字（`the`、`note`、`vpn` 等）時立即轉英。
 /// - 連續誤鍵：逐鍵累計的誤鍵數達門檻時立即轉英（不必等待 Space／Tab 斷點）。
 ///
 /// 進入「英數暫存模式」後不離開唯音：
@@ -146,6 +147,14 @@ extension InputHandlerProtocol {
       return true
     }
 
+    // 內建英文單字：輸入鍵序列恰好拼成清單中的單字時，不必等待誤鍵門檻或斷點鍵即整段轉英。
+    if isSmartEnglishBuiltInWord {
+      let trailJoined = smartEnglishContext.keyTrail.joined()
+      vCLog("SmartEnglish: built-in word trigger; trail=\(trailJoined)")
+      triggerSmartEnglishMode(appendingSpace: false)
+      return true
+    }
+
     // 連續誤鍵達門檻時自動轉英（適用於「所有輸入鍵都是合理按鍵、但輸入順序不合理」的情形）。
     if accountSmartEnglishTypingErrors() { return true }
 
@@ -167,6 +176,19 @@ extension InputHandlerProtocol {
     let trail = smartEnglishContext.keyTrail
     guard trail.count >= 2 else { return false }
     return trail.prefix(2).allSatisfy(Self.smartEnglishPathMarkerKeys.contains)
+  }
+
+  /// 內建英文單字：輸入鍵序列恰好拼成其中之一時立即轉英（清單與收錄原則見 `SmartEnglishBuiltInWords`）。
+  static var smartEnglishBuiltInWords: Set<String> { SmartEnglishBuiltInWords.all }
+
+  /// 輸入鍵序列（整段，非僅尾端）是否恰好為內建英文單字。
+  ///
+  /// 序列於每個音節成文時即重設，故「整段相符」＝這幾鍵是一口氣打出的同一串，
+  /// 不會從正常中文的尾端誤切出單字。
+  var isSmartEnglishBuiltInWord: Bool {
+    let trail = smartEnglishContext.keyTrail
+    guard !trail.isEmpty else { return false }
+    return Self.smartEnglishBuiltInWords.contains(trail.joined())
   }
 
   /// 逐鍵累計「連續誤鍵」次數；達門檻時直接轉為英文輸出。
