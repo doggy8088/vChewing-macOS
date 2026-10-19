@@ -941,7 +941,14 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       Issue.record("Test handler or session is nil.")
       return
     }
-    for word in ["vpn", "zoo", "cal", "note", "tea"] {
+    let testWords = [
+      "vpn", "zoo", "cal", "note", "tea",
+      "git", "asp", "jav", "php", "car", "dot", "llm", "abc", "uni", "zer",
+      "oll", "nvm", "mak", "udl", "yaz", "fin", "lin", "cur", "now", "man",
+      "mkd", "lea", "ech", "ssh", "cat", "cc1", "cc2", "cms", "cd4", "whi",
+      "npm", "kil", "cla", "ope", "agy",
+    ]
+    for word in testWords {
       resetSmartEnglishTestState()
       let keys = word.map(\.description)
       // 最後一鍵之前不得轉英——除非較短的前綴本身也在清單內（`note` 會在 `not` 先觸發）。
@@ -956,10 +963,17 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       #expect(testSession.recentCommissions.joined() == word, "commissions=\(testSession.recentCommissions)")
       #expect(testHandler.composer.isEmpty, "word=\(word)")
     }
-    // 之後的字元一律走英數暫存模式（`note` → `notebook`）。
-    resetSmartEnglishTestState()
-    ["n", "o", "t", "e", "b", "o", "o", "k"].forEach { _ = triageKey($0) }
-    #expect(testSession.recentCommissions.joined() == "notebook")
+    // 之後的字元一律走英數暫存模式（三字元字根觸發後，續打字元完整接成目標詞彙）。
+    for fullWord in [
+      "notebook", "java", "cargo", "dotnet", "unicode", "zerotype", "ollama",
+      "make", "yazi", "find", "link", "curl", "mkdir", "leak", "echo",
+      "which", "kill", "claude", "opencc",
+    ] {
+      resetSmartEnglishTestState()
+      fullWord.map(\.description).forEach { _ = triageKey($0) }
+      #expect(testHandler.isSmartEnglishModeActive, "fullWord=\(fullWord)")
+      #expect(testSession.recentCommissions.joined() == fullWord, "fullWord=\(fullWord)")
+    }
   }
 
   @Test
@@ -989,22 +1003,28 @@ extension LibVanguardTestsRoot.InputHandlerTests {
     #expect(testHandler.smartEnglishErrorThreshold == 5)
     ["x", "t", "e", "a"].forEach { _ = triageKey($0) }
     #expect(!testHandler.isSmartEnglishModeActive, "trail=\(testHandler.smartEnglishKeyTrail)")
-    // 清單外的字（`cat`）不觸發。
+    // 清單外的字（`top` ＝ ㄔㄟ→ㄣ，與正常注音重疊故未收錄）不觸發。
     resetSmartEnglishTestState()
-    ["c", "a", "t"].forEach { _ = triageKey($0) }
+    ["t", "o", "p"].forEach { _ = triageKey($0) }
     #expect(!testHandler.isSmartEnglishModeActive, "trail=\(testHandler.smartEnglishKeyTrail)")
   }
 
   @Test
   func test_SES058_BuiltInWordsStayClearOfZhuyinOrder() throws {
     let parser = Tekkon.MandarinParser.ofDachen
-    // 使用者指定、但違規僅 1 次（近似合理注音）的例外：`vpn` ＝ ㄒㄣ→ㄙ、`zoo` ＝ ㄈㄟㄟ、`cal` ＝ ㄏ→ㄇㄠ。
-    let userSpecifiedExceptions: Set<String> = ["vpn", "zoo", "cal"]
+    // 使用者指定、但在大千排列下違規 < 2 次的例外（實務上仍避開常見中文輸入順序）。
+    let userSpecifiedExceptions: Set<String> = [
+      "vpn", "zoo", "cal",
+      "asp", "oll", "nvm", "cur", "cms", "cd4", "kil", "cla", "ope",
+    ]
     let words = SmartEnglishBuiltInWords.all
-    #expect(words.count == 559)
+    #expect(words.count == 1_119)
     for word in words {
       #expect(word.count >= 3, "word=\(word)")
-      #expect(word.allSatisfy { ("a" ... "z").contains($0) }, "word=\(word)")
+      #expect(
+        word.allSatisfy { ("a" ... "z").contains($0) || ("0" ... "9").contains($0) },
+        "word=\(word)"
+      )
       guard !userSpecifiedExceptions.contains(word) else { continue }
       // 違規 0–1 次＝按鍵順序即為或近似合理注音，收進清單會攔截正常中文。
       let keys = word.map(\.description)

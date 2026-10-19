@@ -9,12 +9,15 @@
 /// 收錄原則（以大千排列逐字模擬輸入、以 `SmartEnglishTrailAnalyzer` 判定）：
 /// - 主體：英文詞頻前 1000 名（google-10000-english，USA、不含粗話）中長度 ≥ 3、
 ///   違規 ≥ 2 次（與注音輸入順序完全不相干）、且預設門檻 5 之下打完整字都不會因連續誤鍵自動轉英者。
-///   違規 0–1 次者（按鍵順序即為或近似合理注音，例如 `top` ＝ ㄔㄟ→ㄣ）一律不收，以免攔截正常中文；
+///   違規 0–1 次者（按鍵順序即為或近似合理注音，例如 `top` ＝ ㄔㄟ→ㄣ）原則上不收，以免攔截正常中文；
 ///   打字途中即會因連續誤鍵自動轉英者亦不收（收了也輪不到觸發）。
-/// - 另收少數詞頻較低、但經使用者指定的字（`vpn`、`zoo`、`cal`、`tea`）。
+/// - 常見三字元技術詞彙（CLI 指令、開發工具、程式語言、協定與格式）與常見英語三字元字根／前綴，
+///   且在大千排列下違規 ≥ 2 次、避開常見中文輸入順序者。
+/// - 另收少數經使用者指定的常用詞彙與技術字根（含 `vpn`、`zoo`、`cal`、`tea` 及 `asp`、`oll`、`nvm`、
+///   `cur`、`cms`、`cd4`、`kil`、`cla`、`ope` 等避開常見中文輸入順序之特例）。
 ///
-/// 只收小寫：Shift+字母會以 `_letter_X` 併入組字區並自序列移除，大寫鍵本就不會留在序列中。
-/// 判定於每一鍵之後進行，故互為前綴的單字（例如 `new` 與 `news`）由較短者先觸發；
+/// 只收小寫英數字元：Shift+字母會以 `_letter_X` 併入組字區並自序列移除，大寫鍵本就不會留在序列中。
+/// 判定於每一鍵之後進行，故互為前綴的單字（例如 `new` 與 `news`、`mak` 與 `make`）由較短者先觸發；
 /// 其後的按鍵在英數暫存模式中照常輸出，客體收到的內容不變。
 enum SmartEnglishBuiltInWords {
   static let all: Set<String> = [
@@ -63,7 +66,44 @@ enum SmartEnglishBuiltInWords {
     "basic", "sony", "shows", "google", "fire", "holiday", "chat", "along", "among", "death", "speed", "html",
     "loss", "face", "brand", "bit", "yellow", "political", "base", "near", "stuff", "japan", "doing", "loans",
     "shoes", "entry", "stay", "nature",
-    // 使用者指定。
+    // 常見三字元技術詞彙與英語字根（大千排列下違規 ≥ 2 次，避開常見中文輸入順序）。
+    "abc", "adb", "aes", "agy", "amd", "ant", "aot", "arc", "arg", "arp", "arr", "asc", "ash", "ast", "asy", "awa",
+    "aws", "bat", "bin", "bom", "brc", "brk", "brw", "bsd", "bsh", "bun", "bzl", "cad", "cas", "cat", "cc1", "cc2",
+    "cdn", "cfg", "cgi", "chm", "chr", "clj", "cmd", "cnt", "cod", "com", "cpu", "crd", "crg", "crl", "crn", "crt",
+    "csh", "css", "cst", "csv", "cut", "cvs", "dav", "deb", "def", "den", "dev", "dhc", "dic", "dif", "dig", "dir",
+    "div", "dkr", "dmg", "dnf", "dns", "dom", "dot", "drv", "dst", "dtr", "ech", "ecs", "edg", "efi", "elf", "elm",
+    "ema", "enu", "env", "eof", "erb", "erl", "err", "etc", "eth", "evt", "exa", "exc", "exe", "exp", "ext", "eza",
+    "fat", "fed", "fet", "ffi", "fig", "fin", "flr", "fmt", "fnc", "fre", "fsh", "fzf", "gcc", "gdb", "gem", "gen",
+    "ghq", "gid", "gif", "git", "gnu", "gor", "gpu", "grd", "gre", "grp", "hdd", "hdr", "hea", "hex", "htm", "hto",
+    "hts", "hub", "iam", "icm", "ide", "idx", "ifc", "img", "inc", "ind", "inf", "ing", "ini", "ins", "int", "iss",
+    "itr", "itm", "jar", "jav", "jdk", "jet", "jre", "jrn", "jsn", "jsx", "jwt", "kaf", "ker", "kms", "ksh", "kvm",
+    "lam", "lan", "lat", "ldd", "lea", "len", "les", "lex", "lib", "lic", "lim", "lin", "lit", "lld", "llm", "llv",
+    "lsc", "lsh", "lst", "lsu", "lua", "lvm", "lxc", "lz4", "mac", "mak", "mal", "mat", "max", "mbr", "mcp", "md5",
+    "mdb", "med", "mem", "mes", "met", "mic", "mid", "min", "mit", "mkd", "mlx", "mnt", "mob", "mod", "mon", "mor",
+    "mov", "mrg", "msg", "msi", "msy", "mtd", "mtl", "mtr", "mtu", "mut", "mvc", "mvn", "nan", "nas", "nat", "nav",
+    "nev", "nfs", "ngi", "nim", "nin", "nod", "nor", "npm", "npu", "npx", "nxt", "oat", "obj", "oci", "ocm", "ocr",
+    "oem", "oid", "onx", "oom", "ord", "org", "ori", "orm", "osx", "ota", "ovr", "pac", "pad", "pag", "pam", "pan",
+    "par", "pas", "pat", "pci", "pcm", "pdf", "pem", "pen", "pet", "pfs", "pgp", "php", "pic", "pid", "pin", "png",
+    "pnp", "pnx", "pod", "por", "pow", "ppa", "ppp", "ppt", "pra", "prb", "prc", "prd", "pre", "prf", "prg", "pri",
+    "prj", "prn", "prt", "prv", "psd", "psh", "pst", "psw", "ptr", "pty", "pub", "pur", "pus", "pvc", "pwd", "pxe",
+    "pyc", "pyd", "pyi", "pyt", "qem", "ram", "ran", "rar", "raw", "rdb", "rdf", "rds", "rea", "reb", "rec", "ref",
+    "reg", "rem", "ren", "req", "res", "ret", "rev", "rgb", "rig", "ris", "rmd", "rnd", "rom", "rot", "rou", "row",
+    "rsa", "rst", "rtc", "rtf", "rtm", "rts", "rtt", "rub", "rwx", "saf", "sam", "sar", "sat", "sav", "sax", "sbt",
+    "scm", "scn", "scr", "sec", "sed", "seg", "sem", "sen", "seq", "ser", "sev", "sft", "sfx", "sha", "shd", "shi",
+    "shm", "sid", "sig", "sim", "sin", "sit", "sma", "smb", "smc", "snd", "sni", "sof", "som", "sor", "sou", "spm",
+    "sqr", "src", "srt", "srv", "ssd", "sse", "ssh", "ssr", "sta", "std", "ste", "stg", "sti", "sto", "str", "stu",
+    "sty", "sub", "suc", "svc", "svg", "svn", "swc", "swf", "swp", "sym", "syn", "sys", "tab", "tag", "tan", "tar",
+    "tec", "tee", "tem", "ten", "ter", "tes", "tex", "tgz", "tha", "thi", "thr", "tic", "tid", "tif", "tim", "tit",
+    "tlm", "tod", "tom", "tor", "tot", "tow", "tpu", "tra", "trc", "tre", "tri", "trn", "tsh", "tsv", "tsx", "ttf",
+    "tty", "txt", "uat", "ubt", "udl", "udp", "uid", "und", "uni", "unq", "unt", "unx", "unz", "upd", "upg", "urb",
+    "urg", "uri", "urn", "usb", "usd", "usi", "usr", "usu", "utc", "utf", "utp", "uvx", "vac", "vag", "var", "vba",
+    "vbs", "vcs", "vec", "ven", "ver", "vga", "vhd", "vic", "vid", "vie", "vim", "vir", "vis", "vit", "vll", "vmw",
+    "vnc", "vod", "vsc", "waf", "wan", "wat", "wav", "wea", "wei", "wer", "wha", "whe", "whi", "wid", "wif", "win",
+    "wir", "wit", "wma", "wom", "wor", "wou", "wpf", "wri", "wsc", "wsh", "wss", "wtf", "www", "xar", "xcb", "xdg",
+    "xen", "xfs", "xid", "xma", "xor", "xrd", "xss", "xxd", "xyz", "yah", "yam", "yaz", "yea", "yor", "yrn", "ytd",
+    "zed", "zen", "zer", "zfs", "zig", "zsh", "zst",
+    // 使用者指定（含大千排列下違規 < 2 次、但實務上避開常見中文輸入順序之技術詞彙與字根）。
     "vpn", "zoo", "cal", "tea",
+    "asp", "oll", "nvm", "cur", "cms", "cd4", "kil", "cla", "ope",
   ]
 }
