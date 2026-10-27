@@ -14,7 +14,7 @@
 /// - 常見三字元技術詞彙（CLI 指令、開發工具、程式語言、協定與格式）與常見英語三字元字根／前綴，
 ///   且在大千排列下違規 ≥ 2 次、避開常見中文輸入順序者。
 /// - 另收少數經使用者指定的常用詞彙與技術字根（含 `vpn`、`zoo`、`cal`、`tea` 及 `asp`、`oll`、`nvm`、
-///   `cur`、`cms`、`cd4`、`kil`、`cla`、`ope` 等避開常見中文輸入順序之特例）。
+///   `cur`、`cms`、`cd4`、`kil`、`cla`、`ope` 等特例，以及 Facebook 前綴 `fa`）。
 ///
 /// 只收小寫英數字元：Shift+字母會以 `_letter_X` 併入組字區並自序列移除，大寫鍵本就不會留在序列中。
 /// 判定於每一鍵之後進行，故互為前綴的單字（例如 `new` 與 `news`、`mak` 與 `make`）由較短者先觸發；
@@ -103,7 +103,7 @@ enum SmartEnglishBuiltInWords {
     "xen", "xfs", "xid", "xma", "xor", "xrd", "xss", "xxd", "xyz", "yah", "yam", "yaz", "yea", "yor", "yrn", "ytd",
     "zed", "zen", "zer", "zfs", "zig", "zsh", "zst",
     // 使用者指定（含大千排列下違規 < 2 次、但實務上避開常見中文輸入順序之技術詞彙與字根）。
-    "vpn", "zoo", "cal", "tea",
+    "vpn", "zoo", "cal", "tea", "fa",
     "asp", "oll", "nvm", "cur", "cms", "cd4", "kil", "cla", "ope",
   ]
 }

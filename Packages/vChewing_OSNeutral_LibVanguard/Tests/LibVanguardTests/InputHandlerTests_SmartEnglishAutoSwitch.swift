@@ -942,7 +942,7 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       return
     }
     let testWords = [
-      "vpn", "zoo", "cal", "note", "tea",
+      "vpn", "zoo", "cal", "note", "tea", "fa",
       "git", "asp", "jav", "php", "car", "dot", "llm", "abc", "uni", "zer",
       "oll", "nvm", "mak", "udl", "yaz", "fin", "lin", "cur", "now", "man",
       "mkd", "lea", "ech", "ssh", "cat", "cc1", "cc2", "cms", "cd4", "whi",
@@ -952,7 +952,7 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       resetSmartEnglishTestState()
       let keys = word.map(\.description)
       // 最後一鍵之前不得轉英——除非較短的前綴本身也在清單內（`note` 會在 `not` 先觸發）。
-      let hasListedPrefix = (3 ..< keys.count).contains {
+      let hasListedPrefix = (2 ..< keys.count).contains {
         SmartEnglishBuiltInWords.all.contains(keys.prefix($0).joined())
       }
       keys.dropLast().forEach { _ = triageKey($0) }
@@ -963,11 +963,11 @@ extension LibVanguardTestsRoot.InputHandlerTests {
       #expect(testSession.recentCommissions.joined() == word, "commissions=\(testSession.recentCommissions)")
       #expect(testHandler.composer.isEmpty, "word=\(word)")
     }
-    // 之後的字元一律走英數暫存模式（三字元字根觸發後，續打字元完整接成目標詞彙）。
+    // 之後的字元一律走英數暫存模式（字根觸發後，續打字元完整接成目標詞彙）。
     for fullWord in [
       "notebook", "java", "cargo", "dotnet", "unicode", "zerotype", "ollama",
       "make", "yazi", "find", "link", "curl", "mkdir", "leak", "echo",
-      "which", "kill", "claude", "opencc",
+      "which", "kill", "claude", "opencc", "facebook",
     ] {
       resetSmartEnglishTestState()
       fullWord.map(\.description).forEach { _ = triageKey($0) }
@@ -1012,15 +1012,15 @@ extension LibVanguardTestsRoot.InputHandlerTests {
   @Test
   func test_SES058_BuiltInWordsStayClearOfZhuyinOrder() throws {
     let parser = Tekkon.MandarinParser.ofDachen
-    // 使用者指定、但在大千排列下違規 < 2 次的例外（實務上仍避開常見中文輸入順序）。
+    // 使用者指定、不受一般收錄條件限制的例外。
     let userSpecifiedExceptions: Set<String> = [
-      "vpn", "zoo", "cal",
+      "vpn", "zoo", "cal", "fa",
       "asp", "oll", "nvm", "cur", "cms", "cd4", "kil", "cla", "ope",
     ]
     let words = SmartEnglishBuiltInWords.all
-    #expect(words.count == 1_119)
+    #expect(words.count == 1_120)
     for word in words {
-      #expect(word.count >= 3, "word=\(word)")
+      #expect(word.count >= 3 || word == "fa", "word=\(word)")
       #expect(
         word.allSatisfy { ("a" ... "z").contains($0) || ("0" ... "9").contains($0) },
         "word=\(word)"
